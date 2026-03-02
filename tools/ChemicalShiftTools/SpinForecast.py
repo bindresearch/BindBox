@@ -451,9 +451,14 @@ class SpinForecast():
             probabilities[peak_names[i]], log_evidence = probability_calc(peak)
             total_log_evidence.append(log_evidence)
             posterior_max.append(max(list(probabilities[peak_names[i]].values())))
-
+   
+        mu = -16.156413504880273
+        sigma = 43.512603134386026
         for i, peak in enumerate(peaks):
-            confidence[peak_names[i]] = sigmoid((total_log_evidence[i] - np.mean(total_log_evidence))/np.std(total_log_evidence))*posterior_max[i]
+            # confidence[peak_names[i]] = sigmoid((total_log_evidence[i] - np.mean(total_log_evidence))/np.std(total_log_evidence))*posterior_max[i]
+            confidence[peak_names[i]] = sigmoid((total_log_evidence[i] - mu)/sigma)*posterior_max[i]
+        
+
 
         st.session_state.possible_assignments = {}
         st.session_state.assignment_confidence = {}
