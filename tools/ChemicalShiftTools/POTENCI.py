@@ -67,7 +67,7 @@ class potenci_page():
 
         if(st.session_state.df.height > 1):
             st.subheader("Predicted spectra")
-            self.combination = st.selectbox("Select atom combination:", ['H-N', 'HA-CA', 'HB-CB', 'CA-N', 'C-N (1-bond)', 'C-N (2-bond)', 'CA-CB'])
+            self.combination = st.selectbox("Select atom combination:", ['H-N', 'HA-CA', 'HB-CB', 'CA-N', 'C-N (1-bond)', 'C-N (2-bond)', 'CA-CB','HA-C'])
 
             self.plot_predicted_spectra()
 
@@ -142,7 +142,7 @@ class potenci_page():
         fig.update_layout(xaxis = dict(title=xlabel, autorange='reversed'))
         fig.update_layout(yaxis = dict(title=ylabel, autorange='reversed'))
             
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, use_container_width=True, config={"toImageButtonOptions": {"format": "svg","height": 600,"width": 800,"scale": 1}})
 
             
             

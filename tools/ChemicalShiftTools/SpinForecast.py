@@ -73,7 +73,7 @@ class SpinForecast():
 
         if(len(list(st.session_state.distribution_dictionary.keys())) > 1):
             st.subheader("Predicted spectra")
-            self.combination = st.selectbox("Select atom combination:", ['H-N', 'HA-CA', 'HB-CB', 'CA-N', 'C-N (1-bond)', 'C-N (2-bond)', 'CA-CB'])
+            self.combination = st.selectbox("Select atom combination:", ['H-N', 'HA-CA', 'HB-CB', 'CA-N', 'C-N (1-bond)', 'C-N (2-bond)', 'CA-CB', 'HA-C'])
 
             self.plot_predicted_distributions()
 
@@ -520,12 +520,10 @@ class SpinForecast():
         fig.update_layout(yaxis = dict(title='Normalised Likelihood'))
         fig.update_layout(title = dict(text='Confidence: {:.3f}'.format(confidence)))
             
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, use_container_width=True, config={"toImageButtonOptions": {"format": "svg","height": 600,"width": 800,"scale": 1}})
 
 
         st.markdown('*The confidence score is a metric of the confidence in the likelihood values. Values far out of the predicted distributions or with low maximum posterior probabilities are given a low confidence score')
-        st.markdown('Rule of thumb')
-
 
             
             

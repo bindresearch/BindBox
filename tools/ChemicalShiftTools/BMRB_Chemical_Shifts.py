@@ -11,6 +11,7 @@ from scipy.optimize import leastsq
 from itertools import combinations
 
 
+
 # This page creates a dashboard of bmrb chemical shift information
 
 
@@ -34,6 +35,11 @@ class bmrb_dashboard():
         data_disordered = self.read_data('./Shifts_Disordered/')
         self.data_disordered = data_disordered.with_columns(pl.lit('Disordered residues').alias('Dataset'))
 
+        print('disordered shifts: ',len(self.data_disordered['chemical shifts (ppm)'].to_list()))
+        print('disordered entries: ', len(self.data_disordered['BMRB entry ID'].unique().to_list()))
+        print('disordered sequences: ', len(self.data_disordered['sequence'].unique().to_list()))
+
+
         # Temperature and pH corrected data to pH 7.0 and a temperature of 298K (terminal residues omitted)
         data_disordered_corrected = self.read_data('./Shifts_Disordered_Corrected/')
         data_disordered_corrected = self.cast_datatypes(data_disordered_corrected)
@@ -45,9 +51,19 @@ class bmrb_dashboard():
         data_all = self.read_data('./Shifts_All/')
         self.data_all = data_all.with_columns(pl.lit('All residues').alias('Dataset'))
 
+        print('all shifts: ',len(self.data_all['chemical shifts (ppm)'].to_list()))
+        print('all entries: ', len(self.data_all['BMRB entry ID'].unique().to_list()))
+        print('all sequences: ', len(self.data_all['sequence'].unique().to_list()))
+
+
+
         data_structured = self.read_data('./Shifts_Structured/')
         self.data_structured = data_structured.with_columns(pl.lit('Structured residues').alias('Dataset'))
         self.potenci_shifts = self.define_POTENCI_shifts()
+
+        print('structured shifts: ',len(self.data_structured['chemical shifts (ppm)'].to_list()))
+        print('structured entries: ', len(self.data_structured['BMRB entry ID'].unique().to_list()))
+        print('structured sequences: ', len(self.data_structured['sequence'].unique().to_list()))
 
         self.atom_names = self.get_atom_names(data_all)
         self.sample_state_options = self.get_sample_states(data_all)
@@ -62,7 +78,7 @@ class bmrb_dashboard():
         if(fig != None):
             fig_aa = self.plot_amino_acid(dataframe)
             col1, col2 = st.columns([3,1], vertical_alignment="center")
-            col1.plotly_chart(fig, use_container_width=True)        
+            col1.plotly_chart(fig, use_container_width=True, config={"toImageButtonOptions": {"format": "svg","height": 600,"width": 800,"scale": 1}})        
             col2.plotly_chart(fig_aa, config = {'displayModeBar': False}, use_container_width=True)
             self.add_download_button(dataframe)
 
