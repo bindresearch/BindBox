@@ -1,7 +1,0 @@
-services:
-  streamlit:
-       build:
-          context: .
-       ports:
-          - "8051:8051"
-
