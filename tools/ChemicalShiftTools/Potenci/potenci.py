@@ -1,7 +1,5 @@
 from __future__ import absolute_import
 from __future__ import print_function
-import sys
-import string
 from scipy.special import erfc
 from scipy.optimize import curve_fit
 import numpy as np
