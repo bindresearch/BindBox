@@ -291,10 +291,10 @@ class SpinForecast():
         2H-N,8.450,121.893,56.297\n
         \n
         '''
-        self.uploaded_file = st.file_uploader('Load peaklist associated with \"initial condition\"', type=['tab','csv','list'], help=help_message)
+        self.uploaded_file = st.file_uploader('Load peaklist"', type=['tab','csv','list'], help=help_message)
 
         if "df_peaklist" not in st.session_state or self.uploaded_file is None:
-            st.subheader('Loaded chemical shifts (initial condition):')
+            st.subheader('Loaded chemical shifts:')
             st.session_state.df_peaklist = pl.DataFrame(schema={"residue":str, "atom 1 (ppm)": float, "atom 2 (ppm)": float, "atom 3 (ppm)": float})       
 
         if self.uploaded_file is not None:
@@ -329,7 +329,7 @@ class SpinForecast():
                         elif(column in ['H', 'N', 'CO', 'C', 'CO(i-1)', 'C(i-1)', 'CA', 'CA(i-1)', 'CB','CB(i-1)', 'HA', 'HB']):
                             columns_stripped.append(column)
                     self.dataframe_peaklist = self.dataframe_peaklist.select(columns_stripped)
-                    st.subheader('Loaded chemical shifts (initial condition):')
+                    st.subheader('Loaded chemical shifts:')
                     st.session_state.df_peaklist = self.dataframe_peaklist
 
         self.placeholder2 = st.empty()
@@ -528,8 +528,8 @@ class SpinForecast():
         st.plotly_chart(fig, use_container_width=True, config={"toImageButtonOptions": {"format": "svg","height": 600,"width": 800,"scale": 1}})
 
 
-        st.markdown('*The confidence score is a metric of the confidence in the likelihood values. Values far out of the predicted distributions or with low maximum posterior probabilities are given a low confidence score')
-
+        st.markdown('*The confidence score (C) is a metric of the confidence in the likelihood values. Values far out of the predicted distributions or with low maximum posterior probabilities are given a low confidence score.')
+        st.markdown('C>0.4 (higher confidence), 0.2<C<0.4 (medium condifence), C<0.2 (lower confidence)')
             
             
 

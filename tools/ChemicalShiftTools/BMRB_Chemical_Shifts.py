@@ -12,6 +12,7 @@ from itertools import combinations
 
 
 
+
 # This page creates a dashboard of bmrb chemical shift information
 
 
@@ -35,9 +36,6 @@ class bmrb_dashboard():
         data_disordered = self.read_data('./Shifts_Disordered/')
         self.data_disordered = data_disordered.with_columns(pl.lit('Disordered residues').alias('Dataset'))
 
-        print('disordered shifts: ',len(self.data_disordered['chemical shifts (ppm)'].to_list()))
-        print('disordered entries: ', len(self.data_disordered['BMRB entry ID'].unique().to_list()))
-        print('disordered sequences: ', len(self.data_disordered['sequence'].unique().to_list()))
 
 
         # Temperature and pH corrected data to pH 7.0 and a temperature of 298K (terminal residues omitted)
@@ -51,9 +49,6 @@ class bmrb_dashboard():
         data_all = self.read_data('./Shifts_All/')
         self.data_all = data_all.with_columns(pl.lit('All residues').alias('Dataset'))
 
-        print('all shifts: ',len(self.data_all['chemical shifts (ppm)'].to_list()))
-        print('all entries: ', len(self.data_all['BMRB entry ID'].unique().to_list()))
-        print('all sequences: ', len(self.data_all['sequence'].unique().to_list()))
 
 
 
@@ -61,9 +56,6 @@ class bmrb_dashboard():
         self.data_structured = data_structured.with_columns(pl.lit('Structured residues').alias('Dataset'))
         self.potenci_shifts = self.define_POTENCI_shifts()
 
-        print('structured shifts: ',len(self.data_structured['chemical shifts (ppm)'].to_list()))
-        print('structured entries: ', len(self.data_structured['BMRB entry ID'].unique().to_list()))
-        print('structured sequences: ', len(self.data_structured['sequence'].unique().to_list()))
 
         self.atom_names = self.get_atom_names(data_all)
         self.sample_state_options = self.get_sample_states(data_all)
@@ -89,7 +81,7 @@ class bmrb_dashboard():
         st.text("* Note that mis-assigned residues are not omitted from the results.")
 
     
-    @st.cache_data
+    @st.cache_resource
     def read_data(_self, file_path: str):
         """
         Read the dataframes and then return
@@ -517,7 +509,8 @@ TYR 175.49651  57.82427  38.76184 121.43652   8.05749   4.51123   2.91782'''
         return fig_aa
     
     
-    def get_filtered_data(self, structure: str, atom: str = '', residue: str = ''):
+    @st.cache_resource
+    def get_filtered_data(_self, structure: str, atom: str = '', residue: str = ''):
         """
         Filter the data in the dataframe by the current user selected options.
         
@@ -538,13 +531,13 @@ TYR 175.49651  57.82427  38.76184 121.43652   8.05749   4.51123   2.91782'''
         """
 
         if(structure == 'disordered'):
-            dataframe = self.data_disordered
+            dataframe = _self.data_disordered
         elif(structure == 'disordered (corrected)'):
-            dataframe = self.data_disordered_corrected
+            dataframe = _self.data_disordered_corrected
         elif(structure == 'all'):
-            dataframe = self.data_all
+            dataframe = _self.data_all
         else:
-            dataframe = self.data_structured
+            dataframe = _self.data_structured
         
         if(atom!=''):
             dataframe = dataframe.filter(pl.col('atom')==atom)
@@ -552,25 +545,25 @@ TYR 175.49651  57.82427  38.76184 121.43652   8.05749   4.51123   2.91782'''
         if(residue!=''):
             dataframe = dataframe.filter(pl.col('residue')==residue)
 
-        dataframe = self.filter_data_by_condition(dataframe)
-        dataframe = self.filter_by_organism(dataframe)
-        if(self.filter_by_preceding):
-            if(self.overlays == 'Individual amino acid/atom' or self.overlays == 'Individual amino acid/atom 2D'):
-                if(self.overlay_preceding!=True):
+        dataframe = _self.filter_data_by_condition(dataframe)
+        dataframe = _self.filter_by_organism(dataframe)
+        if(_self.filter_by_preceding):
+            if(_self.overlays == 'Individual amino acid/atom' or _self.overlays == 'Individual amino acid/atom 2D'):
+                if(_self.overlay_preceding!=True):
                     try:
-                        if(self.atom_2D != 'C-N (1-bond)'):
-                            dataframe = self.filter_data_by_neighboring_residues(dataframe, preceding_residue=self.preceding_residue)
+                        if(_self.atom_2D != 'C-N (1-bond)'):
+                            dataframe = _self.filter_data_by_neighboring_residues(dataframe, preceding_residue=_self.preceding_residue)
                     except:
-                        dataframe = self.filter_data_by_neighboring_residues(dataframe, preceding_residue=self.preceding_residue)
-        if(self.filter_by_following):
-            if(self.overlays == 'Individual amino acid/atom' or self.overlays == 'Individual amino acid/atom 2D'):
-                if(self.overlay_following!=True):
-                    dataframe = self.filter_data_by_neighboring_residues(dataframe, following_residue=self.preceding_residue)
+                        dataframe = _self.filter_data_by_neighboring_residues(dataframe, preceding_residue=_self.preceding_residue)
+        if(_self.filter_by_following):
+            if(_self.overlays == 'Individual amino acid/atom' or _self.overlays == 'Individual amino acid/atom 2D'):
+                if(_self.overlay_following!=True):
+                    dataframe = _self.filter_data_by_neighboring_residues(dataframe, following_residue=_self.preceding_residue)
 
         return dataframe
     
-
-    def filter_data_by_neighboring_residues(self, dataframe, preceding_residue: str = '', following_residue: str = ''):
+    @st.cache_resource
+    def filter_data_by_neighboring_residues(_self, dataframe, preceding_residue: str = '', following_residue: str = ''):
         """
         Filter the dataframe by preceding residue and following residue.
 
@@ -585,44 +578,46 @@ TYR 175.49651  57.82427  38.76184 121.43652   8.05749   4.51123   2.91782'''
         return dataframe
         
 
-    def filter_data_by_condition(self, dataframe):
+    @st.cache_resource
+    def filter_data_by_condition(_self, dataframe):
         """
         Filter the data by condition such as temperature, pH, ionic strength
         and pressure and return the updated dataframe.
         """
-        if(self.filter_by_sample_state == True):
-            dataframe = dataframe.filter(pl.col('sample state')==self.sample_state)
-        if(self.filter_by_temperature):
-            dataframe = dataframe.filter(pl.col('temperature (K)').cast(pl.Float64, strict=False)>=float(self.tmin))
-            dataframe = dataframe.filter(pl.col('temperature (K)').cast(pl.Float64, strict=False)<=float(self.tmax))
-        if(self.filter_by_pH):
-            dataframe = dataframe.filter(pl.col('pH').cast(pl.Float64, strict=False)>=float(self.pH_min))
-            dataframe = dataframe.filter(pl.col('pH').cast(pl.Float64, strict=False)<=float(self.pH_max))
-        if(self.filter_by_pressure):
-            dataframe = dataframe.filter(pl.col('pressure (atm)').cast(pl.Float64, strict=False)>=float(self.pressure_min))
-            dataframe = dataframe.filter(pl.col('pressure (atm)').cast(pl.Float64, strict=False)<=float(self.pressure_max))
-        if(self.filter_by_ion_strength):
-            dataframe = dataframe.filter(pl.col('ionic strength (M)').cast(pl.Float64, strict=False)>=float(self.ion_stength_min))
-            dataframe = dataframe.filter(pl.col('ionic strength (M)').cast(pl.Float64, strict=False)<=float(self.ion_stength_max))
+        if(_self.filter_by_sample_state == True):
+            dataframe = dataframe.filter(pl.col('sample state')==_self.sample_state)
+        if(_self.filter_by_temperature):
+            dataframe = dataframe.filter(pl.col('temperature (K)').cast(pl.Float64, strict=False)>=float(_self.tmin))
+            dataframe = dataframe.filter(pl.col('temperature (K)').cast(pl.Float64, strict=False)<=float(_self.tmax))
+        if(_self.filter_by_pH):
+            dataframe = dataframe.filter(pl.col('pH').cast(pl.Float64, strict=False)>=float(_self.pH_min))
+            dataframe = dataframe.filter(pl.col('pH').cast(pl.Float64, strict=False)<=float(_self.pH_max))
+        if(_self.filter_by_pressure):
+            dataframe = dataframe.filter(pl.col('pressure (atm)').cast(pl.Float64, strict=False)>=float(_self.pressure_min))
+            dataframe = dataframe.filter(pl.col('pressure (atm)').cast(pl.Float64, strict=False)<=float(_self.pressure_max))
+        if(_self.filter_by_ion_strength):
+            dataframe = dataframe.filter(pl.col('ionic strength (M)').cast(pl.Float64, strict=False)>=float(_self.ion_stength_min))
+            dataframe = dataframe.filter(pl.col('ionic strength (M)').cast(pl.Float64, strict=False)<=float(_self.ion_stength_max))
 
         return dataframe
     
-    def filter_by_organism(self, dataframe):
+    @st.cache_resource
+    def filter_by_organism(_self, dataframe):
         """
         Filter the data by organism of origin features such as
         superkingdom (Eukaryota, Prokaryota), organism common name etc
         """
-        if(self.superkingdom=='All' and self.common_name=='All'):
+        if(_self.superkingdom=='All' and _self.common_name=='All'):
             return dataframe
         
-        if(self.superkingdom == 'All'):
-            if(self.common_name!='non-human'):
-                dataframe = dataframe.filter(pl.col('organism common name')==self.common_name)
+        if(_self.superkingdom == 'All'):
+            if(_self.common_name!='non-human'):
+                dataframe = dataframe.filter(pl.col('organism common name')==_self.common_name)
             else:
                 dataframe = dataframe.filter(pl.col('organism common name')!='human')
 
         else:
-            dataframe = dataframe.filter(pl.col('organism superkingdom')==self.superkingdom)
+            dataframe = dataframe.filter(pl.col('organism superkingdom')==_self.superkingdom)
 
         return dataframe
 
@@ -664,7 +659,7 @@ TYR 175.49651  57.82427  38.76184 121.43652   8.05749   4.51123   2.91782'''
             structure = 'structured'
         else:
             # Return a warning to say that only one option for "Residues to plot" can be selected while the data selection is XXX
-            st.error(body = f'Only one option for \"Residues to plot\" can be selected while the data selection is \"{self.overlays}\". Please reduce the number of selections for \"Residues to plot\" and try again.',icon="🚨")
+            st.error(body = f'Only one option for \"Residues to plot\" can be selected while the data selection is \"{self.overlays}\". Please select one option from \"Residues to plot\" and try again.',icon="🚨")
             return None, None
 
         if(self.overlays == 'Individual amino acid/atom 3D'):
@@ -716,7 +711,7 @@ TYR 175.49651  57.82427  38.76184 121.43652   8.05749   4.51123   2.91782'''
             structure = 'structured'
         else:
             # Return a warning to say that only one option for "Residues to plot" can be selected while the data selection is XXX
-            st.error(body = f'Only one option for \"Residues to plot\" can be selected while the data selection is \"{self.overlays}\". Please reduce the number of selections for \"Residues to plot\" and try again.',icon="🚨")
+            st.error(body = f'Only one option for \"Residues to plot\" can be selected while the data selection is \"{self.overlays}\". Please select one option from \"Residues to plot\" and try again.',icon="🚨")
             return None, None
 
         if(self.overlays == 'Individual amino acid/atom 2D'):
@@ -809,7 +804,7 @@ TYR 175.49651  57.82427  38.76184 121.43652   8.05749   4.51123   2.91782'''
                 dataframe, fig = self.plot_overlay()
             else:
                 # Return a warning to say that only one option for "Residues to plot" can be selected while the data selection is XXX
-                st.error(body = f'Only one option for \"Residues to plot\" can be selected while the data selection is \"{self.overlays}\". Please reduce the number of selections for \"Residues to plot\" and try again.',icon="🚨")
+                st.error(body = f'Only one option for \"Residues to plot\" can be selected while the data selection is \"{self.overlays}\". Please select one option from \"Residues to plot\" and try again.',icon="🚨")
                 return None, None
             return dataframe, fig
 
@@ -932,6 +927,9 @@ TYR 175.49651  57.82427  38.76184 121.43652   8.05749   4.51123   2.91782'''
         """
         For the x and y values which give the maximum of the histogram
         """
+
+
+
         x_edges = np.arange(x.min(), x.max() + float(self.bin_width), float(self.bin_width))
         y_edges = np.arange(y.min(), y.max() + float(self.bin_width2), float(self.bin_width2))
         hist, x_edges, y_edges = np.histogram2d(x, y, bins=[x_edges, y_edges])
@@ -1035,15 +1033,16 @@ TYR 175.49651  57.82427  38.76184 121.43652   8.05749   4.51123   2.91782'''
                 point_values.append(value)
                 
                 if(plot_scatter):
-                    x_max, y_max = self.find_xmax_ymax(x, y)
+                    try:
+                        x_max, y_max = self.find_xmax_ymax(x, y)
 
-                if(plot_scatter):
-                    if(len(atom_pairs)==1):
-                        text = legendgroup
-                    else:
-                        text = legendgroup + ' (' + pair + ')'
-                    scatter_plots.append(go.Scatter(x=[x_max], y=[y_max], text=text, hoverinfo='text', mode='markers', name='', marker=dict(color=colors[i], size=6), showlegend=False, legendgroup=legendgroup))
-
+                        if(len(atom_pairs)==1):
+                            text = legendgroup
+                        else:
+                            text = legendgroup + ' (' + pair + ')'
+                        scatter_plots.append(go.Scatter(x=[x_max], y=[y_max], text=text, hoverinfo='text', mode='markers', name='', marker=dict(color=colors[i], size=6), showlegend=False, legendgroup=legendgroup))
+                    except:
+                        pass
         if(plot_scatter):
             for plot in scatter_plots:
                 fig.add_trace(plot)

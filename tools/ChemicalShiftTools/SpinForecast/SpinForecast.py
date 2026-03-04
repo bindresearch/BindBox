@@ -18,7 +18,7 @@ class SpinForecastBackend():
         # Temperature and pH corrected data to pH 7.0 and a temperature of 298K (terminal residues omitted)
         self.data_disordered = self.read_data('./Shifts_Disordered_Corrected_Referenced/')
 
-    @st.cache_data
+    @st.cache_resource
     def read_data(_self, file_path: str):
         """
         Read the dataframes and then return
