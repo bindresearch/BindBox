@@ -89,7 +89,7 @@ class bmrb_dashboard():
 
         for i, residue in enumerate(residues):
             file = Path(file_path+residue+'.parquet')
-            df = pl.read_parquet(file)
+            df = pl.scan_parquet(file)
             if(i==0):
                 df_total = df
             else:
@@ -99,12 +99,12 @@ class bmrb_dashboard():
     
     
     @st.cache_data
-    def get_atom_names(_self, data_all):
-        return sorted(data_all['atom'].unique().to_list())
+    def get_atom_names(_self, _data_all):
+        return sorted(_data_all.select('atom').unique().collect().to_series().to_list())
     
     @st.cache_data
-    def get_sample_states(_self, data_all):
-        states = data_all['sample state'].unique().to_list()
+    def get_sample_states(_self, _data_all):
+        states = _data_all.select('sample state').unique().collect().to_series().to_list()
         # Move solution and solid to the start of the list
         states.remove('solution')
         states.remove('solid')
@@ -112,8 +112,8 @@ class bmrb_dashboard():
         return states
     
     @st.cache_data
-    def get_superkingdoms(_self, data_all):
-        superkingdoms = data_all['organism superkingdom'].unique().to_list()
+    def get_superkingdoms(_self, _data_all):
+        superkingdoms = _data_all.select('organism superkingdom').unique().collect().to_series().to_list()
         # Move All, Eukaryota, Prokaryota to the start of the list
         superkingdoms.remove('eukaryote')
         superkingdoms.remove('prokaryote')
@@ -121,8 +121,8 @@ class bmrb_dashboard():
         return superkingdoms
     
     @st.cache_data
-    def get_common_names(_self, data_all):
-        common_names = data_all['organism common name'].unique().to_list()
+    def get_common_names(_self, _data_all):
+        common_names = _data_all.select('organism common name').unique().collect().to_series().to_list()
         # Move All, Eukaryota, Prokaryota to the start of the list
         common_names.remove('human')
         common_names = ['All', 'human', 'non-human'] + common_names
@@ -227,12 +227,13 @@ TYR 175.49651  57.82427  38.76184 121.43652   8.05749   4.51123   2.91782'''
         st.logo('./bind-logo-alpha.svg', size="large", link="https://bindresearch.org", icon_image='./bind-logo-alpha.svg')
         # Creating a subsection to select data to plot
         st.sidebar.subheader("Data selection:")
-        options = ['Individual amino acid/atom', 'Individual amino acid/atom 2D', 'Individual amino acid/atom 3D', 'All amino acids for selected atom', 'All amino acids for selected atom 2D', 'All amino acids for selected atom 3D','All atoms for selected amino acid']
+        # options = ['Individual amino acid/atom', 'Individual amino acid/atom 2D', 'Individual amino acid/atom 3D', 'All amino acids for selected atom', 'All amino acids for selected atom 2D', 'All amino acids for selected atom 3D','All atoms for selected amino acid']
+        options = ['Individual amino acid/atom', 'Individual amino acid/atom 2D',  'All amino acids for selected atom', 'All amino acids for selected atom 2D', 'All atoms for selected amino acid']
         self.overlays = st.sidebar.selectbox(label = '', options=options)
         
         if(self.overlays == 'Individual amino acid/atom'):
             self.residue = st.sidebar.selectbox("Select Amino Acid:", self.residues)
-            atom_list_jumbled = self.data_disordered.filter(pl.col('residue')==self.residue)["atom"].unique().to_list()
+            atom_list_jumbled = self.data_disordered.filter(pl.col('residue')==self.residue).select('atom').unique().collect().to_series().to_list()
             atom_list = []
             for name in self.atom_names:
                 if(name in atom_list_jumbled):
@@ -360,7 +361,7 @@ TYR 175.49651  57.82427  38.76184 121.43652   8.05749   4.51123   2.91782'''
         """
 
         fig_aa = make_subplots(rows=1, cols=1, specs=[[{'secondary_y': False}]])
-        atoms = dataframe['atom'].unique().to_list()
+        atoms = dataframe.select('atom').unique().collect().to_series().to_list()
         coordinate_dictionary = {'H':(-1,-1), 'N': (-1,0), 'HA': (0,-1), 'CA': (0,0), 'C': (1,0), 'CB': (0,1), 'HB': [(1,1), (-1,1)], 'CG': (0,2), 'HG': [(-1,2), (1,2)], 'CD/ND': (0,3), 'HD': [(1,3), (-1,3)], 'CE/NE': (0,4), 'HE': [(1,4), (-1,4)], 'CZ/NZ': (0,5), 'HZ': [(1,5), (-1,5)], 'CH/NH': (0,6), 'HH': [(1,6), (-1,6)]}
         
         coords = []
@@ -509,8 +510,7 @@ TYR 175.49651  57.82427  38.76184 121.43652   8.05749   4.51123   2.91782'''
         return fig_aa
     
     
-    @st.cache_resource
-    def get_filtered_data(_self, structure: str, atom: str = '', residue: str = ''):
+    def get_filtered_data(self, structure: str, atom: str = '', residue: str = ''):
         """
         Filter the data in the dataframe by the current user selected options.
         
@@ -531,13 +531,13 @@ TYR 175.49651  57.82427  38.76184 121.43652   8.05749   4.51123   2.91782'''
         """
 
         if(structure == 'disordered'):
-            dataframe = _self.data_disordered
+            dataframe = self.data_disordered
         elif(structure == 'disordered (corrected)'):
-            dataframe = _self.data_disordered_corrected
+            dataframe = self.data_disordered_corrected
         elif(structure == 'all'):
-            dataframe = _self.data_all
+            dataframe = self.data_all
         else:
-            dataframe = _self.data_structured
+            dataframe = self.data_structured
         
         if(atom!=''):
             dataframe = dataframe.filter(pl.col('atom')==atom)
@@ -545,25 +545,33 @@ TYR 175.49651  57.82427  38.76184 121.43652   8.05749   4.51123   2.91782'''
         if(residue!=''):
             dataframe = dataframe.filter(pl.col('residue')==residue)
 
-        dataframe = _self.filter_data_by_condition(dataframe)
-        dataframe = _self.filter_by_organism(dataframe)
-        if(_self.filter_by_preceding):
-            if(_self.overlays == 'Individual amino acid/atom' or _self.overlays == 'Individual amino acid/atom 2D'):
-                if(_self.overlay_preceding!=True):
+        dataframe = self.filter_data_by_condition(dataframe)
+        dataframe = self.filter_by_organism(dataframe)
+        if(self.filter_by_preceding):
+            if(self.overlays == 'Individual amino acid/atom' or self.overlays == 'Individual amino acid/atom 2D'):
+                try:
+                    if(self.overlay_preceding!=True):
+                        try:
+                            if(self.atom_2D != 'C-N (1-bond)'):
+                                dataframe = self.filter_data_by_neighboring_residues(dataframe, preceding_residue=self.preceding_residue)
+                        except:
+                            dataframe = self.filter_data_by_neighboring_residues(dataframe, preceding_residue=self.preceding_residue)
+                except:
                     try:
-                        if(_self.atom_2D != 'C-N (1-bond)'):
-                            dataframe = _self.filter_data_by_neighboring_residues(dataframe, preceding_residue=_self.preceding_residue)
+                        if(self.atom_2D != 'C-N (1-bond)'):
+                            dataframe = self.filter_data_by_neighboring_residues(dataframe, preceding_residue=self.preceding_residue)
                     except:
-                        dataframe = _self.filter_data_by_neighboring_residues(dataframe, preceding_residue=_self.preceding_residue)
-        if(_self.filter_by_following):
-            if(_self.overlays == 'Individual amino acid/atom' or _self.overlays == 'Individual amino acid/atom 2D'):
-                if(_self.overlay_following!=True):
-                    dataframe = _self.filter_data_by_neighboring_residues(dataframe, following_residue=_self.preceding_residue)
-
+                        dataframe = self.filter_data_by_neighboring_residues(dataframe, preceding_residue=self.preceding_residue)
+        if(self.filter_by_following):
+            if(self.overlays == 'Individual amino acid/atom' or self.overlays == 'Individual amino acid/atom 2D'):
+                try:
+                    if(self.overlay_following!=True):
+                        dataframe = self.filter_data_by_neighboring_residues(dataframe, following_residue=self.preceding_residue)
+                except:
+                    dataframe = self.filter_data_by_neighboring_residues(dataframe, following_residue=self.preceding_residue)
         return dataframe
     
-    @st.cache_resource
-    def filter_data_by_neighboring_residues(_self, dataframe, preceding_residue: str = '', following_residue: str = ''):
+    def filter_data_by_neighboring_residues(self, dataframe, preceding_residue: str = '', following_residue: str = ''):
         """
         Filter the dataframe by preceding residue and following residue.
 
@@ -578,46 +586,44 @@ TYR 175.49651  57.82427  38.76184 121.43652   8.05749   4.51123   2.91782'''
         return dataframe
         
 
-    @st.cache_resource
-    def filter_data_by_condition(_self, dataframe):
+    def filter_data_by_condition(self, dataframe):
         """
         Filter the data by condition such as temperature, pH, ionic strength
         and pressure and return the updated dataframe.
         """
-        if(_self.filter_by_sample_state == True):
-            dataframe = dataframe.filter(pl.col('sample state')==_self.sample_state)
-        if(_self.filter_by_temperature):
-            dataframe = dataframe.filter(pl.col('temperature (K)').cast(pl.Float64, strict=False)>=float(_self.tmin))
-            dataframe = dataframe.filter(pl.col('temperature (K)').cast(pl.Float64, strict=False)<=float(_self.tmax))
-        if(_self.filter_by_pH):
-            dataframe = dataframe.filter(pl.col('pH').cast(pl.Float64, strict=False)>=float(_self.pH_min))
-            dataframe = dataframe.filter(pl.col('pH').cast(pl.Float64, strict=False)<=float(_self.pH_max))
-        if(_self.filter_by_pressure):
-            dataframe = dataframe.filter(pl.col('pressure (atm)').cast(pl.Float64, strict=False)>=float(_self.pressure_min))
-            dataframe = dataframe.filter(pl.col('pressure (atm)').cast(pl.Float64, strict=False)<=float(_self.pressure_max))
-        if(_self.filter_by_ion_strength):
-            dataframe = dataframe.filter(pl.col('ionic strength (M)').cast(pl.Float64, strict=False)>=float(_self.ion_stength_min))
-            dataframe = dataframe.filter(pl.col('ionic strength (M)').cast(pl.Float64, strict=False)<=float(_self.ion_stength_max))
+        if(self.filter_by_sample_state == True):
+            dataframe = dataframe.filter(pl.col('sample state')==self.sample_state)
+        if(self.filter_by_temperature):
+            dataframe = dataframe.filter(pl.col('temperature (K)').cast(pl.Float64, strict=False)>=float(self.tmin))
+            dataframe = dataframe.filter(pl.col('temperature (K)').cast(pl.Float64, strict=False)<=float(self.tmax))
+        if(self.filter_by_pH):
+            dataframe = dataframe.filter(pl.col('pH').cast(pl.Float64, strict=False)>=float(self.pH_min))
+            dataframe = dataframe.filter(pl.col('pH').cast(pl.Float64, strict=False)<=float(self.pH_max))
+        if(self.filter_by_pressure):
+            dataframe = dataframe.filter(pl.col('pressure (atm)').cast(pl.Float64, strict=False)>=float(self.pressure_min))
+            dataframe = dataframe.filter(pl.col('pressure (atm)').cast(pl.Float64, strict=False)<=float(self.pressure_max))
+        if(self.filter_by_ion_strength):
+            dataframe = dataframe.filter(pl.col('ionic strength (M)').cast(pl.Float64, strict=False)>=float(self.ion_stength_min))
+            dataframe = dataframe.filter(pl.col('ionic strength (M)').cast(pl.Float64, strict=False)<=float(self.ion_stength_max))
 
         return dataframe
     
-    @st.cache_resource
-    def filter_by_organism(_self, dataframe):
+    def filter_by_organism(self, dataframe):
         """
         Filter the data by organism of origin features such as
         superkingdom (Eukaryota, Prokaryota), organism common name etc
         """
-        if(_self.superkingdom=='All' and _self.common_name=='All'):
+        if(self.superkingdom=='All' and self.common_name=='All'):
             return dataframe
         
-        if(_self.superkingdom == 'All'):
-            if(_self.common_name!='non-human'):
-                dataframe = dataframe.filter(pl.col('organism common name')==_self.common_name)
+        if(self.superkingdom == 'All'):
+            if(self.common_name!='non-human'):
+                dataframe = dataframe.filter(pl.col('organism common name')==self.common_name)
             else:
                 dataframe = dataframe.filter(pl.col('organism common name')!='human')
 
         else:
-            dataframe = dataframe.filter(pl.col('organism superkingdom')==_self.superkingdom)
+            dataframe = dataframe.filter(pl.col('organism superkingdom')==self.superkingdom)
 
         return dataframe
 
@@ -833,7 +839,7 @@ TYR 175.49651  57.82427  38.76184 121.43652   8.05749   4.51123   2.91782'''
                 if(self.overlay_following==True):
                     identifier = 'following residue type'
 
-            values = dataframe[identifier].unique().to_numpy()
+            values = dataframe.select(identifier).unique().collect().to_series().to_numpy()
             for i, value in enumerate(values):
                 if(value not in self.residues):
                     np.delete(values,i)
@@ -853,10 +859,16 @@ TYR 175.49651  57.82427  38.76184 121.43652   8.05749   4.51123   2.91782'''
         dataframe_dis_corrected = self.get_filtered_data(structure='disordered (corrected)', atom=self.atom, residue=self.residue)
         dataframe_struct = self.get_filtered_data(structure='structured', atom=self.atom, residue=self.residue)
         df_combined = pl.concat([dataframe_all, dataframe_dis, dataframe_struct, dataframe_dis_corrected], how='vertical')
-        df_combined = df_combined.with_columns(pl.lit(df_combined["Dataset"] + ": amino acid=" + df_combined["residue"]).alias("Group"))
-        values = df_combined["residue"].unique().to_numpy()
+        df_combined = df_combined.with_columns(pl.concat_str([pl.col("Dataset"),pl.lit(": amino acid="),pl.col("residue")]).alias("Group"))
+        values = df_combined.select("residue").unique().collect().to_series().to_numpy()
         color_map = {g: colors[i % len(colors)] for i, g in enumerate(values)}
         flag='residue'
+
+
+
+        
+
+
 
         residues_to_plot = []
         if(self.show_disordered):
@@ -891,8 +903,8 @@ TYR 175.49651  57.82427  38.76184 121.43652   8.05749   4.51123   2.91782'''
                 ]).filter(pl.col('group_size')==2))
         
             
-        x = dataframe["xval"].to_numpy()
-        y = dataframe["yval"].to_numpy()
+        x = dataframe.select("xval").collect().to_series().to_numpy()
+        y = dataframe.select("yval").collect().to_series().to_numpy()
 
         return x, y
         
@@ -1081,9 +1093,9 @@ TYR 175.49651  57.82427  38.76184 121.43652   8.05749   4.51123   2.91782'''
             )
 
             
-        x = dataframe["xval"].to_numpy()
-        y = dataframe["yval"].to_numpy()
-        z = dataframe["zval"].to_numpy()
+        x = dataframe.select("xval").collect().to_series().to_numpy()
+        y = dataframe.select("yval").collect().to_series().to_numpy()
+        z = dataframe.select("zval").collect().to_series().to_numpy()
 
         return x, y, z
     
@@ -1332,7 +1344,7 @@ TYR 175.49651  57.82427  38.76184 121.43652   8.05749   4.51123   2.91782'''
       
         for value in values:
             df = dataframe.filter(pl.col(identifier)==value)
-            x=df["chemical shifts (ppm)"].to_numpy()
+            x=df.select("chemical shifts (ppm)").collect().to_series().to_numpy()
             fig.add_trace(go.Histogram(
                 x=x,
                 opacity=0.6,
@@ -1437,7 +1449,7 @@ TYR 175.49651  57.82427  38.76184 121.43652   8.05749   4.51123   2.91782'''
                         histnorm="probability density"
                     ))
         elif(flag == 'residue'):
-            for i, residue in enumerate(dataframe["residue"].unique().to_numpy()):
+            for i, residue in enumerate(dataframe.select("residue").unique().collect().to_series().to_numpy()):
                 for dataset_val in residues_to_plot:
                     filtered = dataframe.filter(pl.col("Dataset")==dataset_val)
                     if(dataset_val=='Disordered residues'):
@@ -1449,8 +1461,8 @@ TYR 175.49651  57.82427  38.76184 121.43652   8.05749   4.51123   2.91782'''
                     else:
                         opacity = 0.2
                     fig.add_trace(go.Histogram(
-                        x=filtered["chemical shifts (ppm)"].to_numpy(),
-                        name=f"{dataset_val}: amino acid={residue}"+ ', {} shifts'.format(len(filtered["chemical shifts (ppm)"].to_list())),
+                        x=filtered.select("chemical shifts (ppm)").collect().to_series().to_numpy(),
+                        name=f"{dataset_val}: amino acid={residue}"+ ', {} shifts'.format(len(filtered.select("chemical shifts (ppm)").collect().to_series().to_list())),
                         opacity=opacity,
                         marker_color=colormap[residue],
                         histnorm="probability density"
@@ -1467,7 +1479,7 @@ TYR 175.49651  57.82427  38.76184 121.43652   8.05749   4.51123   2.91782'''
         return fig
 
     def convert_for_download(_self, _df):
-        return _df.write_csv().encode("utf-8")
+        return _df.collect().write_csv().encode("utf-8")
     
 
 # A class to fit a normal distribution to the chemical shift statistics
