@@ -80,7 +80,6 @@ class bmrb_dashboard():
         st.markdown("https://bmrb.io")
         st.text("* Note that mis-assigned residues are not omitted from the results.")
 
-        st.set_page_config('minimal')
 
     
     @st.cache_resource
