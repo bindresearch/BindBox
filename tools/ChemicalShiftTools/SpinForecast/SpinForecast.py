@@ -152,6 +152,7 @@ class SpinForecastBackend():
                     df_total2 = df_total1.filter(pl.col('preceding residue type')==residue_dict_reverse[iminus1_residue])
 
                 elif(atom=='H' or atom=='N'):
+                # elif(atom!='C'):
                     df_total = df1.filter(pl.col('residue')==residue_dict_reverse[residue])
                     df_total1 = df_total.filter(pl.col('preceding residue type')==residue_dict_reverse[iminus1_residue])
                     df_total2 = df_total1.filter(pl.col('following residue type')==residue_dict_reverse[iplus1_residue])
@@ -161,9 +162,9 @@ class SpinForecastBackend():
                     df_total1 = df_total.filter(pl.col('following residue type')==residue_dict_reverse[iplus1_residue])
                     df_total2 = df_total1.filter(pl.col('preceding residue type')==residue_dict_reverse[iminus1_residue])
                 
-                if(len(df_total2.select('chemical shifts (ppm)').collect().to_series().to_numpy())>=10):
+                if(len(df_total2.select('chemical shifts (ppm)').collect().to_series().to_numpy())>=5):
                     df_final = df_total2
-                elif(len(df_total1.select('chemical shifts (ppm)').collect().to_series().to_numpy())>=10):
+                if(len(df_total1.select('chemical shifts (ppm)').collect().to_series().to_numpy())>=5):
                     df_final = df_total1
                 else:
                     df_final = df_total

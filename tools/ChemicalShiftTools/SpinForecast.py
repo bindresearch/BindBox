@@ -357,6 +357,8 @@ class SpinForecast():
         atoms = []
         indexes = []
 
+        weights = {'CA':1, 'CA(i-1)':1, 'CB':1, 'CB(i-1)':1, 'N':1, 'C':1,'C(i-1)':1,'CO':1,'CO(i-1)':1, 'H':0.5}
+
         for j, checkbox in enumerate(self.column_checkboxes):
             if(checkbox==True):
                 atoms.append(columns[j])
@@ -381,7 +383,17 @@ class SpinForecast():
 
         kdes = {}
 
-        for i, residue in enumerate(list(dictionaries[atoms[0]].keys())):
+        # peak_residue_names = self.dataframe_peaklist[self.dataframe_peaklist.columns[0]].to_list()
+        lists = []
+        for atom in atoms:
+            lists.append(list(dictionaries[atom].keys()))
+        
+        list_of_residues = []
+        for k,list_ in enumerate(lists):
+            list_of_residues = set(list_+list(list_of_residues))
+
+
+        for i, residue in enumerate(list_of_residues):
             kdes[residue] = {}
             for atom in atoms:
                 try:
@@ -393,26 +405,30 @@ class SpinForecast():
             
 
         
-        classes = list(dictionaries[atoms[0]].keys())
+        classes = list(dictionaries[atoms[1]].keys())
         priors = {cls: 1 / len(classes) for cls in classes}
         
 
         def probability_calc(shifts):
             log_scores = {}
+            counts = {}
 
             for cls in classes:
                 try:
                     probability = np.log(priors[cls])
+                    count=0
                     for i, atom in enumerate(atoms):
                         if(shifts[i]==999):
                             # No chemical shift inputted
                             continue
                         else:
                             p = kdes[cls][atom](shifts[i])[0]
-                            probability = probability+np.log(p)
+                            probability = probability+np.log(p)*weights[atom]
+                            count+=1
 
 
                     log_scores[cls] = probability
+                    counts = count
                 except:
                     pass
 
@@ -427,7 +443,7 @@ class SpinForecast():
             log_evidence = max_val + np.log(total)
 
 
-            return posteriors, log_evidence
+            return posteriors, log_evidence, counts
         
 
         def sigmoid(x):
@@ -445,18 +461,21 @@ class SpinForecast():
 
         probabilities = {}
         confidence = {}
+        counts = {}
         posterior_max = []
         total_log_evidence = []
         for i, peak in enumerate(peaks):
-            probabilities[peak_names[i]], log_evidence = probability_calc(peak)
+            probabilities[peak_names[i]], log_evidence, counts[peak_names[i]] = probability_calc(peak)
             total_log_evidence.append(log_evidence)
             posterior_max.append(max(list(probabilities[peak_names[i]].values())))
    
+
+
         mu = -16.156413504880273
         sigma = 43.512603134386026
         for i, peak in enumerate(peaks):
             # confidence[peak_names[i]] = sigmoid((total_log_evidence[i] - np.mean(total_log_evidence))/np.std(total_log_evidence))*posterior_max[i]
-            confidence[peak_names[i]] = sigmoid((total_log_evidence[i] - mu)/sigma)*posterior_max[i]
+            confidence[peak_names[i]] = sigmoid((total_log_evidence[i] - mu)/sigma)*posterior_max[i]*counts[peak_names[i]]/(counts[peak_names[i]]+6)*2
         
 
 
@@ -522,13 +541,13 @@ class SpinForecast():
 
         fig = go.Figure(data=[go.Bar(x=names,y=likelihoods, marker={'color': color})])
         fig.update_layout(xaxis = dict(title='Residue'))
-        fig.update_layout(yaxis = dict(title='Normalised Likelihood'))
+        fig.update_layout(yaxis = dict(title='Normalised Likelihood', range=[0,1]))
         fig.update_layout(title = dict(text='Confidence: {:.3f}'.format(confidence)))
             
         st.plotly_chart(fig, use_container_width=True, config={"toImageButtonOptions": {"format": "svg","height": 600,"width": 800,"scale": 1}})
 
-
-        st.markdown('*The confidence score (C) is a metric of the confidence in the likelihood values. Values far out of the predicted distributions or with low maximum posterior probabilities are given a low confidence score.')
+        st.markdown('These results should be used only as a guide to aid assignment and should be combined with other methods for validation. Peaks can sometimes be outside of the distribution of disordered residues in the BMRB.')
+        st.markdown('The confidence score (C) is a metric of the confidence in the likelihood values. Values far out of the predicted distributions or with low maximum posterior probabilities are given a low confidence score.')
         st.markdown('C>0.4 (higher confidence), 0.2<C<0.4 (medium condifence), C<0.2 (lower confidence)')
             
             
