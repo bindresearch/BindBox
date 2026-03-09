@@ -548,7 +548,7 @@ class SpinForecast():
 
         st.markdown('These results should be used only as a guide to aid assignment and should be combined with other methods for validation. Peaks can sometimes be outside of the distribution of disordered residues in the BMRB.')
         st.markdown('The confidence score (C) is a metric of the confidence in the likelihood values. Values far out of the predicted distributions or with low maximum posterior probabilities are given a low confidence score.')
-        st.markdown('C>0.4 (higher confidence), 0.2<C<0.4 (medium condifence), C<0.2 (lower confidence)')
+        st.markdown('C>0.4 (higher confidence), 0.2<C<0.4 (medium confidence), C<0.2 (lower confidence)')
             
             
 

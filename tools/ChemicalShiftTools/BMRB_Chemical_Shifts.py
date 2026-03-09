@@ -80,6 +80,8 @@ class bmrb_dashboard():
         st.markdown("https://bmrb.io")
         st.text("* Note that mis-assigned residues are not omitted from the results.")
 
+        st.set_page_config('minimal')
+
     
     @st.cache_resource
     def read_data(_self, file_path: str):
@@ -817,14 +819,14 @@ TYR 175.49651  57.82427  38.76184 121.43652   8.05749   4.51123   2.91782'''
         if(self.overlays == 'All amino acids for selected atom'):
             dataframe = self.get_filtered_data(structure=structure, atom=self.atom)
             title = f"Overlay Histogram across amino acids (atom={self.atom})"
-            residues = dataframe["residue"].unique().to_numpy()
+            residues = dataframe.select("residue").collect().to_series().unique().to_numpy()
             identifier = "residue"
             values = residues
             color_map = {g: colors[i % len(colors)] for i, g in enumerate(residues)}
         elif(self.overlays == 'All atoms for selected amino acid'):
             dataframe = self.get_filtered_data(structure = structure, atom = '', residue = self.residue)
             title = f"Overlay Histogram across atoms (amino acid={self.residue})"
-            atoms = dataframe["atom"].unique().to_numpy()
+            atoms = dataframe.select("atom").collect().to_series().unique().to_numpy()
             identifier = "atom"
             values = atoms
             color_map = {g: colors[i % len(colors)] for i, g in enumerate(atoms)}
@@ -1369,7 +1371,7 @@ TYR 175.49651  57.82427  38.76184 121.43652   8.05749   4.51123   2.91782'''
                 if(n1==1):
                     fit_class = fitter(dataframe, float(self.bin_width))
                     A, mu, sigma = fit_class.fit()
-                    x1 = np.arange(min(dataframe['chemical shifts (ppm)'].to_numpy()),max(dataframe['chemical shifts (ppm)'].to_numpy()), 0.005)
+                    x1 = np.arange(min(dataframe.select('chemical shifts (ppm)').collect().to_series().to_numpy()),max(dataframe.select('chemical shifts (ppm)').collect().to_series().to_numpy()), 0.005)
                     y1 = fit_class.normal_dist(A,mu,sigma,x1)
                     df_fit = pl.DataFrame({'x':x1,'y':y1})
                     name = 'mean={:.2f}'.format(mu) + ', standard deviation={:.2f}'.format(sigma)
@@ -1443,7 +1445,7 @@ TYR 175.49651  57.82427  38.76184 121.43652   8.05749   4.51123   2.91782'''
                         opacity = 0.2
                     fig.add_trace(go.Histogram(
                         x=filtered["chemical shifts (ppm)"],
-                        name=f"{dataset_val}: atom={atom}" + ', {} shifts'.format(len(filtered["chemical shifts (ppm)"].to_list())),
+                        name=f"{dataset_val}: atom={atom}" + ', {} shifts'.format(len(filtered.select('chemical shifts (ppm)').collect().to_series().to_list())),
                         opacity=opacity,
                         marker_color = colormap[atom],
                         histnorm="probability density"
@@ -1497,7 +1499,7 @@ class fitter():
         bin_width : int or float
                     The width of the histogram bins currently selected (in units of ppm)
         """
-        self.shifts = dataframe['chemical shifts (ppm)'].to_numpy()
+        self.shifts = dataframe.select('chemical shifts (ppm)').collect().to_series().to_numpy()
         number_of_bins = int((max(self.shifts)-min(self.shifts))/bin_width)
         self.hist, bin_edges = np.histogram(self.shifts, bins=number_of_bins, density=True)
         self.bin_centres = (bin_edges[:-1]+bin_edges[1:])/2

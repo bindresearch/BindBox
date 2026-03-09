@@ -729,14 +729,14 @@ TYR 175.49651  57.82427  38.76184 121.43652   8.05749   4.51123   2.91782'''
         if(self.overlays == 'All amino acids for selected atom'):
             dataframe = self.get_filtered_data(structure=structure, atom=self.atom)
             title = f"Overlay Histogram across amino acids (atom={self.atom})"
-            residues = dataframe["residue"].unique().to_numpy()
+            residues = dataframe.select("residue").collect().to_series().unique().to_numpy()
             identifier = "residue"
             values = residues
             color_map = {g: colors[i % len(colors)] for i, g in enumerate(residues)}
         elif(self.overlays == 'All atoms for selected amino acid'):
             dataframe = self.get_filtered_data(structure = structure, atom = '', residue = self.residue)
             title = f"Overlay Histogram across atoms (amino acid={self.residue})"
-            atoms = dataframe["atom"].unique().to_numpy()
+            atoms = dataframe.select("atom").collect().to_series().unique().to_numpy()
             identifier = "atom"
             values = atoms
             color_map = {g: colors[i % len(colors)] for i, g in enumerate(atoms)}
@@ -751,7 +751,7 @@ TYR 175.49651  57.82427  38.76184 121.43652   8.05749   4.51123   2.91782'''
                 if(self.overlay_following==True):
                     identifier = 'following residue type'
 
-            values = dataframe[identifier].unique().to_numpy()
+            values = dataframe.select("identifier").collect().to_series().unique().to_numpy()
             for i, value in enumerate(values):
                 if(value not in self.residues):
                     np.delete(values,i)
