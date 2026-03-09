@@ -18,9 +18,6 @@ RUN pip install -r requirements.txt
 # Copy the source code into the container.
 COPY . .
 
-ENV STREAMLIT_SERVER_ADDRESS=0.0.0.0
-ENV STREAMLIT_SERVER_PORT=8501
-
 # Expose the port that the application listens on.
 EXPOSE 8501
 
