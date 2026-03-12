@@ -1,8 +1,4 @@
 import streamlit as st
-import polars as pl
-import plotly.graph_objects as go
-import plotly.express as px
-import numpy as np
 
 # This page creates a front end tool where users can download SpinExplorer and read its documentation
 

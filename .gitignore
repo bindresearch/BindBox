@@ -32,6 +32,9 @@ MANIFEST
 *.manifest
 *.spec
 
+# Generating third party license report
+generate_third_party_licenses.py
+
 # Installer logs
 pip-log.txt
 pip-delete-this-directory.txt
