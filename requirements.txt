@@ -5,4 +5,5 @@ plotly==6.3.0
 polars==1.33.1
 scipy==1.15.3
 watchdog==6.0.0
+darkdetect==0.8.0
 

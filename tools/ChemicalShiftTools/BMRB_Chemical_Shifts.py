@@ -9,6 +9,7 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 from scipy.optimize import leastsq
 from itertools import combinations
+import darkdetect
 
 
 
@@ -841,9 +842,19 @@ TYR 175.49651  57.82427  38.76184 121.43652   8.05749   4.51123   2.91782'''
                     identifier = 'following residue type'
 
             values = dataframe.select(identifier).unique().collect().to_series().to_numpy()
+            values_trimmed = []
             for i, value in enumerate(values):
-                if(value not in self.residues):
-                    np.delete(values,i)
+                if(value in self.residues):
+                    values_trimmed.append(value)
+                elif(value==''):
+                    values_trimmed.append('')
+                elif(value==','):
+                    values_trimmed.append('')
+                else:
+                    pass
+            values = values_trimmed  
+
+
             color_map = {g: colors[i % len(colors)] for i, g in enumerate(values)}
         
         fig = self.plot_histogram(dataframe, title, color=color_map, identifier = identifier, values=values)
@@ -988,7 +999,10 @@ TYR 175.49651  57.82427  38.76184 121.43652   8.05749   4.51123   2.91782'''
         
         """
 
-        colormaps = [['white', color] for color in colors]
+        if(darkdetect.isDark()==False):
+            colormaps = [['white', color] for color in colors]
+        else:
+            colormaps = [['#0f1117', color] for color in colors]
         point_colors = []
         point_values = []
         scatter_plots = []

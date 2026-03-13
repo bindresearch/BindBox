@@ -3,26 +3,35 @@ import polars as pl
 import plotly.graph_objects as go
 import plotly.express as px
 import numpy as np
+import pandas as pd
+import darkdetect
 from scipy.stats import gaussian_kde
 from tools.ChemicalShiftTools.Potenci.potenci import potenci_backend
 from tools.ChemicalShiftTools.SpinForecast.SpinForecast import SpinForecastBackend
 
-# This page creates a front end tool where users can run BindDisAssign for sequence specific chemical shift distributions
+# This page creates a front end tool where users can run SpinForecast for sequence specific chemical shift distributions
 # The page also produces plots of the predicted two-dimensional NMR spectra in each case (e.g. H-N, HA-CA, CA-N, C-N, CA-C etc)
-# The backend code is in Pages/BindDisAssign
+# The backend code is in SpinForecast/SpinForecast.py
 
 
 st.set_page_config(layout="wide")
 
+# Defining useful information used thbroughout code
 residue_1_letter_codes = ['A', 'R', 'N', 'D', 'C', 'Q', 'E', 'G', 'H', 'I', 'L', 'K', 'M', 'F', 'P', 'S', 'T', 'W', 'Y', 'V']
 residue_dict = {'ALA': 'A', 'ARG': 'R', 'ASN': 'N', 'ASP': 'D', 'CYS': 'C', 'GLN': 'Q', 'GLU': 'E', 'GLY': 'G', 'HIS': 'H', 'ILE': 'I', 'LEU': 'L', 'LYS': 'K', 'MET': 'M', 'PHE': 'F', 'PRO': 'P', 'SER': 'S', 'THR': 'T', 'TRP': 'W','TYR': 'Y','VAL': 'V', '': 'X'}
 residue_dict_reversed = {(v,k) for k,v in residue_dict.items()}
 colors = px.colors.qualitative.Alphabet
 color_dict = {}
 colormap_dict = {}
-for i, r in enumerate(residue_1_letter_codes):
-    color_dict[r] = colors[i]
-    colormap_dict[r] = ['white', colors[i]]
+
+if(darkdetect.isDark()==False):
+    for i, r in enumerate(residue_1_letter_codes):
+        color_dict[r] = colors[i]
+        colormap_dict[r] = ['white', colors[i]]
+else:
+    for i, r in enumerate(residue_1_letter_codes):
+        color_dict[r] = colors[i]
+        colormap_dict[r] = ['#0f1117', colors[i]]
 
 class SpinForecast():
     """
@@ -64,7 +73,7 @@ class SpinForecast():
         self.pH_value = col1.text_input(label="pH", value='7.4')
         self.temp_value = col2.text_input(label="Temperature (K)", value='298.0')
         self.ionic_strength = col3.text_input(label="Ionic Strength (M)", value='0.15')
-        st.button('Plot predicted distributions', on_click=self.run_bindpredict)
+        st.button('Plot predicted distributions', on_click=self.run_spinforecast)
 
 
         if "distribution_dictionary" not in st.session_state:
@@ -85,9 +94,9 @@ class SpinForecast():
         if('possible_assignments' in st.session_state):
             self.plot_predicted_assignments()
 
-    def run_bindpredict(self):
+    def run_spinforecast(self):
         """
-        This code runs BindPredictDCS on the 1 letter amino acid sequence provided. 
+        This code runs SpinForecast on the 1 letter amino acid sequence provided. 
         """
 
         if(self.perform_checks()==True):
@@ -176,65 +185,63 @@ class SpinForecast():
 
         fig = go.Figure()
         for i, residue in enumerate(list(dictionary2.keys())):
-                if(residue not in list(dictionary1.keys())):
-                    continue
-                if(residue not in list(dictionary2.keys())):
-                    continue
-                    
-                xvals = dictionary1[residue]
-                yvals = dictionary2[residue]
+            if(residue not in list(dictionary1.keys())):
+                continue
+            if(residue not in list(dictionary2.keys())):
+                continue
+                
+            xvals = dictionary1[residue]
+            yvals = dictionary2[residue]
 
-                x = xvals
-                y = yvals
+            x = xvals
+            y = yvals
 
-                kde_x = gaussian_kde(x)
-                kde_y = gaussian_kde(y)
+            kde_x = gaussian_kde(x)
+            kde_y = gaussian_kde(y)
 
-                nx = int((max(x)-min(x))/bin_width1)
-                ny = int((max(y)-min(y))/bin_width2)
+            # nx = int((max(x)-min(x))/bin_width1)
+            # ny = int((max(y)-min(y))/bin_width2)
 
-                nx=50
-                ny=50
+            nx=50
+            ny=50
 
-                rangex = max(x)-min(x)
-                rangey = max(y)-min(y)
-                x_counts, x_edges = np.histogram(x, bins=nx, range=(min(x)-rangex/2, max(x)+rangex/2))
-                y_counts, y_edges = np.histogram(y, bins=ny, range=(min(y)-rangey/2, max(y)+rangey/2))
+            rangex = max(x)-min(x)
+            rangey = max(y)-min(y)
+            x_counts, x_edges = np.histogram(x, bins=nx, range=(min(x)-rangex/2, max(x)+rangex/2))
+            y_counts, y_edges = np.histogram(y, bins=ny, range=(min(y)-rangey/2, max(y)+rangey/2))
 
-                x_centers = 0.5*(x_edges[:-1] + x_edges[1:])
-                y_centers = 0.5*(y_edges[:-1] + y_edges[1:])
+            x_centers = 0.5*(x_edges[:-1] + x_edges[1:])
+            y_centers = 0.5*(y_edges[:-1] + y_edges[1:])
 
 
-                x_smooth = kde_x(x_centers)
-                y_smooth = kde_y(y_centers)
+            x_smooth = kde_x(x_centers)
+            y_smooth = kde_y(y_centers)
 
-                # Build 2D independent grid
-                Z = np.outer(y_smooth, x_smooth)
-                Z = Z / np.sum(Z)
+            # Adding 2D grid
+            Z = np.outer(y_smooth, x_smooth)
+            Z = Z / np.sum(Z)
 
-                max_x = np.argmax(Z, axis=1)
-                max_y = np.argmax(Z, axis=0)
+            max_x = np.argmax(Z, axis=1)
+            max_y = np.argmax(Z, axis=0)
                 
 
-                label = residue + self.aa_sequence[int(residue)-1]
-                color = color_dict[self.aa_sequence[int(residue)-1]]
-                colormap = colormap_dict[self.aa_sequence[int(residue)-1]]
+            label = residue + self.aa_sequence[int(residue)-1]
+            color = color_dict[self.aa_sequence[int(residue)-1]]
+            colormap = colormap_dict[self.aa_sequence[int(residue)-1]]
 
-                # # Plot a 2D histogram based on the xvals and yvals distributions
-
-                fig.add_trace(go.Contour(
-                    x=x_centers,
-                    y=y_centers,
-                    z=Z,
-                    contours=dict(coloring="lines"),
-                    colorscale=colormap,
-                    name=label,
-                    showscale=False,
-                    showlegend=True,
-                    hoverinfo='skip',
-                ))
-
-                fig.add_trace(go.Scatter(x=[x_centers[max_x][0]], y=[y_centers[max_y][0]], hovertext=label, text=label,  mode='markers', marker_color=color, showlegend=True, name=label))
+            # Plotting a 2D histogram based on the xvals and yvals distributions
+            fig.add_trace(go.Contour(
+                x=x_centers,
+                y=y_centers,
+                z=Z,
+                contours=dict(coloring="lines"),
+                colorscale=colormap,
+                name=label,
+                showscale=False,
+                showlegend=True,
+                hoverinfo='skip',
+            ))
+            fig.add_trace(go.Scatter(x=[x_centers[max_x][0]], y=[y_centers[max_y][0]], hovertext=label, text=label,  mode='markers', marker_color=color, showlegend=True, name=label))
 
 
 
@@ -303,17 +310,14 @@ class SpinForecast():
                 from io import StringIO
                 error = False
                 filetype = Path(self.uploaded_file.name).suffix
-                if(filetype == 'csv'):
+                if(filetype == '.csv'):
                     self.dataframe_peaklist = pl.read_csv(self.uploaded_file)
                 elif(filetype == '.tab' or filetype == '.list'):
                     text = self.uploaded_file.getvalue().decode()
 
-                    # Replace arbitrary whitespace with a single tab
+                    # Replacing arbitrary whitespace with a single tab (to allow for incorrectly formatted peaklist)
                     cleaned = re.sub(r"[ \t]+", "\t", text)
-
-                    # Put cleaned text into a text buffer
                     buffer = StringIO(cleaned)
-
                     self.dataframe_peaklist = pl.read_csv(buffer, separator="\t")
 
                 else:
@@ -352,23 +356,24 @@ class SpinForecast():
         dictionary = st.session_state.distribution_dictionary
 
         
-        # atoms = ['N', 'CA', 'CA(i-1)', 'CB', 'CB(i-1)', 'C', 'C(i-1)']
         columns = self.dataframe_peaklist.columns[1:]
-        atoms = []
+        self.atoms = []
         indexes = []
 
+        # Defining weights to describe the contribution of each atom to the overall prediction
+        # H chemical shifts are downweighted as they are highly variable compared to other nuclei
         weights = {'CA':1, 'CA(i-1)':1, 'CB':1, 'CB(i-1)':1, 'N':1, 'C':1,'C(i-1)':1,'CO':1,'CO(i-1)':1, 'H':0.5}
 
         for j, checkbox in enumerate(self.column_checkboxes):
             if(checkbox==True):
-                atoms.append(columns[j])
+                self.atoms.append(columns[j])
                 indexes.append(j+1)
 
         
         
 
         dictionaries = {}
-        for atom in atoms:
+        for atom in self.atoms:
             atom_stripped = atom.strip('(i-1)')
             dictionaries[atom] = dictionary[atom_stripped]
 
@@ -383,9 +388,8 @@ class SpinForecast():
 
         kdes = {}
 
-        # peak_residue_names = self.dataframe_peaklist[self.dataframe_peaklist.columns[0]].to_list()
         lists = []
-        for atom in atoms:
+        for atom in self.atoms:
             lists.append(list(dictionaries[atom].keys()))
         
         list_of_residues = []
@@ -395,7 +399,7 @@ class SpinForecast():
 
         for i, residue in enumerate(list_of_residues):
             kdes[residue] = {}
-            for atom in atoms:
+            for atom in self.atoms:
                 try:
                     vals = dictionaries[atom][residue]
                     kde = gaussian_kde(vals)
@@ -405,26 +409,30 @@ class SpinForecast():
             
 
         
-        classes = list(dictionaries[atoms[1]].keys())
+        classes = list(list_of_residues)
         priors = {cls: 1 / len(classes) for cls in classes}
         
 
         def probability_calc(shifts):
             log_scores = {}
             counts = {}
+            log_scores_per_atom = {}
 
             for cls in classes:
                 try:
                     probability = np.log(priors[cls])
                     count=0
-                    for i, atom in enumerate(atoms):
+                    for i, atom in enumerate(self.atoms):
                         if(shifts[i]==999):
                             # No chemical shift inputted
                             continue
                         else:
+                            if(atom not in log_scores_per_atom):
+                                log_scores_per_atom[atom] = {}
                             p = kdes[cls][atom](shifts[i])[0]
                             probability = probability+np.log(p)*weights[atom]
                             count+=1
+                            log_scores_per_atom[atom][cls] = np.log(p)
 
 
                     log_scores[cls] = probability
@@ -432,22 +440,18 @@ class SpinForecast():
                 except:
                     pass
 
-            # Convert to stable probabilities
             max_val = max(log_scores.values())
             exp_scores = {c: np.exp(v - max_val) for c, v in log_scores.items()}
             total = sum(exp_scores.values())
 
             posteriors = {c: v / total for c, v in exp_scores.items()}
 
-            # Absolute evidence in original scale
             log_evidence = max_val + np.log(total)
 
 
-            return posteriors, log_evidence, counts
-        
 
-        def sigmoid(x):
-            return 1 / (1 + np.exp(-x))
+            return posteriors, log_evidence, counts, log_scores_per_atom
+        
 
 
         peaks = []
@@ -460,47 +464,139 @@ class SpinForecast():
             peaks.append(peak_values)
 
         probabilities = {}
-        confidence = {}
+        out_of_distribution_zscore = {}
+        log_score_per_atom = {}
         counts = {}
         posterior_max = []
         total_log_evidence = []
         for i, peak in enumerate(peaks):
-            probabilities[peak_names[i]], log_evidence, counts[peak_names[i]] = probability_calc(peak)
+            probabilities[peak_names[i]], log_evidence, counts[peak_names[i]], log_score_per_atom[peak_names[i]] = probability_calc(peak)
             total_log_evidence.append(log_evidence)
             posterior_max.append(max(list(probabilities[peak_names[i]].values())))
    
 
-
+        
         mu = -16.156413504880273
         sigma = 43.512603134386026
-        for i, peak in enumerate(peaks):
-            # confidence[peak_names[i]] = sigmoid((total_log_evidence[i] - np.mean(total_log_evidence))/np.std(total_log_evidence))*posterior_max[i]
-            confidence[peak_names[i]] = sigmoid((total_log_evidence[i] - mu)/sigma)*posterior_max[i]*counts[peak_names[i]]/(counts[peak_names[i]]+6)*2
+
+        print(np.mean(total_log_evidence))
+        print(np.std(total_log_evidence))
         
+        
+        
+
+        # mu and sigma were chosen as the mean and sigma of total_log_evidence for a validation peaklist
+        mu = -7.93
+        sigma = 2.82
+
+
+        for i, peak in enumerate(peaks):
+            # total_log_evidence[i] reports how far the predictions made for peak[i] are in or out of the predicted distributions for all nuclei
+            # It is effectively equivalent to log(P(D)) where D is the experimental data
+            out_of_distribution_zscore[peak_names[i]] = (total_log_evidence[i] - mu)/sigma
 
 
         st.session_state.possible_assignments = {}
-        st.session_state.assignment_confidence = {}
+        st.session_state.out_of_distribution_zscore = {}
+        st.session_state.possible_assignments_atom_confidence = {}
+        st.session_state.assignment_report = {}
         for peak_name in peak_names:
 
             probs = probabilities[peak_name]
             possibilities = []
             for key, val in probs.items():
                 if(val>0.01):
+                    # If the likelihood is larger than 0.01 then these values are included in the list of possible assignments
                     possibilities.append([key,val])
+
+        
+        
+
+
+            names = []
+            numbers = []
+            likelihoods = []
+        
+            for i, d in enumerate(possibilities):
+                names.append(d[0] + self.aa_sequence[int(d[0])-1])
+                numbers.append(d[0])
+                likelihoods.append(d[1])
             
-            if(confidence[peak_name] < 0.2):
-                conf=' (low confidence)'    
-            elif(confidence[peak_name] < 0.4):
-                conf=' (medium confidence)'
-            else:
-                conf=' (high confidence)'
+        
+
+            set_of_predictions = numbers
+            atom_set_evidence = {}
+            atom_individual_evidence = {}
+            total_set_evidence = 0
+            total_individual_evidence = {}
+            length_of_evidence = 0
+
+
+            def logsumexp(vals):
+                # Performing a sum of exponentials without running into numerical exponential problems then taking the log
+                m = max(vals)
+                return m + np.log(sum(np.exp(v-m) for v in vals))
             
-            st.session_state.possible_assignments[peak_name+conf] = possibilities
-            st.session_state.assignment_confidence[peak_name+conf] = confidence[peak_name]
+
+            # Finding how well the predictions for the set of chosen assignments align with the experimental peaklist
+            # compared to all other residues not chosen for the assignment
+            for atom, cls_vals in log_score_per_atom[peak_name].items():
+                win_vals = [cls_vals[c] for c in cls_vals if c in set_of_predictions]
+                other_vals = [cls_vals[c] for c in cls_vals if c not in set_of_predictions]
+                log_p_win = logsumexp(win_vals) - np.log(len(win_vals))
+                log_p_rest = logsumexp(other_vals) - np.log(len(other_vals))
+                atom_set_evidence[atom] = log_p_win - log_p_rest
+                total_set_evidence+=log_p_win - log_p_rest
+                length_of_evidence+=1
+
+            if(len(set_of_predictions)>1):
+                # For each prediction in the set of possible predictions
+                # Finding how well the predictions for this prediction aligns with the experimental peaklist
+                # compared to all other members of the set of predictions combined
+                for prediction in set_of_predictions:
+                    atom_individual_evidence[prediction+self.aa_sequence[int(prediction)-1]] = {}
+                    total_individual_evidence[prediction+self.aa_sequence[int(prediction)-1]] = 0
+                    for atom, cls_vals in log_score_per_atom[peak_name].items():
+                        win_vals = [cls_vals[c] for c in cls_vals if c == prediction]
+                        other_vals = [cls_vals[c] for c in cls_vals if c != prediction and c in set_of_predictions]
+                        log_p_win = logsumexp(win_vals) - np.log(len(win_vals))
+                        log_p_rest = logsumexp(other_vals) - np.log(len(other_vals))
+                        atom_individual_evidence[prediction+self.aa_sequence[int(prediction)-1]][atom] = log_p_win - log_p_rest
+                        total_individual_evidence[prediction+self.aa_sequence[int(prediction)-1]] += log_p_win - log_p_rest
+
+
+            out_of_distribution_score = out_of_distribution_zscore[peak_name]
+            atom_score = log_score_per_atom[peak_name]
+
+
+            # Assigning a colour based on the Jeffreys scale
+            try:
+                if(max(likelihoods)>0.75):
+                    peak_name = peak_name + ' (higher likelihood)'
+                elif(max(likelihoods)>0.5):
+                    peak_name = peak_name + ' (medium likelihood)'
+                else:
+                    peak_name = peak_name + ' (small likelihood)'
+            except:
+                # usually because no likelihoods were above 0.01 (rare but possible)
+                peak_name = peak_name + ' (small likelihood)'
+
+
+            st.session_state.assignment_report[peak_name] = {}
+            st.session_state.assignment_report[peak_name]['names'] = names
+            st.session_state.assignment_report[peak_name]['likelihoods'] = likelihoods
+            st.session_state.assignment_report[peak_name]['set of predictions'] = numbers
+            st.session_state.assignment_report[peak_name]['total set evidence'] = total_set_evidence
+            st.session_state.assignment_report[peak_name]['atom set evidence'] = atom_set_evidence
+            st.session_state.assignment_report[peak_name]['atom individual evidence'] = atom_individual_evidence
+            st.session_state.assignment_report[peak_name]['total individual evidence'] = total_individual_evidence
 
 
 
+            # Saving the predictions to the streamlit session
+            st.session_state.possible_assignments[peak_name] = possibilities
+            st.session_state.out_of_distribution_zscore[peak_name] = out_of_distribution_score
+            st.session_state.possible_assignments_atom_confidence[peak_name] = atom_score
         
 
 
@@ -512,11 +608,10 @@ class SpinForecast():
         in a bar chart
         """
 
-        # container = st.container()
 
         st.subheader("Predicted assignments")
         keys = list(st.session_state.possible_assignments.keys())
-        order = {"high confidence": 0, "medium confidence": 1, "low confidence": 2}
+        order = {"higher likelihood": 0, "medium likelihood": 1, "small likelihood": 2}
         try:
             sorted_values = sorted(keys, key=lambda x: order[x.split('(')[1].split(')')[0]])
             keys = sorted_values
@@ -525,36 +620,115 @@ class SpinForecast():
         self.peak_choice = st.selectbox("Select peak:", keys)
         names = []
         likelihoods = []
-        for d in st.session_state.possible_assignments[self.peak_choice]:
-            names.append(d[0] + self.aa_sequence[int(d[0])-1])
-            likelihoods.append(d[1])
+        
+    
 
+        set_of_predictions = st.session_state.assignment_report[self.peak_choice]['set of predictions']
+        names = st.session_state.assignment_report[self.peak_choice]['names']
+        likelihoods = st.session_state.assignment_report[self.peak_choice]['likelihoods']
+        atom_set_evidence = st.session_state.assignment_report[self.peak_choice]['atom set evidence']
+        total_set_evidence = st.session_state.assignment_report[self.peak_choice]['total set evidence']
+        atom_individual_evidence = st.session_state.assignment_report[self.peak_choice]['atom individual evidence']
+        total_individual_evidence = st.session_state.assignment_report[self.peak_choice]['total individual evidence']
 
-        confidence = st.session_state.assignment_confidence[self.peak_choice]
-        if(confidence < 0.2):
+          
+        # Assigning a colour based on the Jeffreys scale for log[Bayes-factor]
+        if(total_set_evidence < 1):
             color = '#cb4f33'
-        elif(confidence < 0.4):
+        elif(total_set_evidence < 2.5):
             color = '#e1a558'
+        elif(total_set_evidence < 5):
+            color = "#85d1be"
         else:
-            color = '#74c1ae'
+            color = "#11604c"
 
 
         fig = go.Figure(data=[go.Bar(x=names,y=likelihoods, marker={'color': color})])
         fig.update_layout(xaxis = dict(title='Residue'))
-        fig.update_layout(yaxis = dict(title='Normalised Likelihood', range=[0,1]))
-        fig.update_layout(title = dict(text='Confidence: {:.3f}'.format(confidence)))
+        fig.update_layout(yaxis = dict(title='Likelihood', range=[0,1]))
             
         st.plotly_chart(fig, use_container_width=True, config={"toImageButtonOptions": {"format": "svg","height": 600,"width": 800,"scale": 1}})
+    
+        
+        
 
-        st.markdown('These results should be used only as a guide to aid assignment and should be combined with other methods for validation. Peaks can sometimes be outside of the distribution of disordered residues in the BMRB.')
-        st.markdown('The confidence score (C) is a metric of the confidence in the likelihood values. Values far out of the predicted distributions or with low maximum posterior probabilities are given a low confidence score.')
-        st.markdown('C>0.4 (higher confidence), 0.2<C<0.4 (medium confidence), C<0.2 (lower confidence)')
+        st.subheader("Evidence for set of predictions")
+        
+        st.markdown(r'Values represent a log(Bayes-factor)*, equivalent to log(posterior-odds), reporting on the odds of the prediction being correct over the comparison.')
+
+        st.markdown('**Positive**: supports prediction choice over comparison')
+        st.markdown('**Negative**: contradicts prediction choice over comparison')
+        
+        # Creating a table showing the per-atom evidence for the predictions made
+        table_titles = ['Prediction', 'Comparison'] + list(atom_set_evidence.keys()) + ['Total']
+        table_rows = []
+        if(len(set_of_predictions)==1):
+            row_set = [set_of_predictions[0]+self.aa_sequence[int(set_of_predictions[0])-1], 'All other residues']
+        else:
+            title = 'Set('
+            for i,prediction in enumerate(set_of_predictions):
+                title+=prediction+self.aa_sequence[int(prediction)-1]
+                if(i<len(set_of_predictions)-1):
+                    title+=','
+                else:
+                    title+=')'
+
+            row_set = [title, 'All other residues']
+        
+        for atom in list(atom_set_evidence.keys()):
+            row_set.append(atom_set_evidence[atom])
+        row_set.append(total_set_evidence)
+        table_rows.append(row_set)
+
+        if(len(set_of_predictions)>1):
+            for prediction in set_of_predictions:
+                title = prediction+self.aa_sequence[int(prediction)-1] 
+                if(len(set_of_predictions)>2):
+                    comparison = 'Set('
+                else:
+                    comparison = ''
+                count = 0
+                for i,pred in enumerate(set_of_predictions):
+                    if(pred!=prediction):
+                        comparison+=pred+self.aa_sequence[int(pred)-1]
+                        count+=1
+                        if(count<len(set_of_predictions)-1):
+                            comparison+=','
+                        else:
+                            if(len(set_of_predictions)>2):
+                                comparison+=')'
+                row=[title, comparison]
+                
+                for atom, evidence in atom_individual_evidence[prediction+self.aa_sequence[int(prediction)-1]].items():
+                    row.append(evidence)
+                row.append(total_individual_evidence[prediction+self.aa_sequence[int(prediction)-1]])
+
+                table_rows.append(row)
+
+
+        df = pd.DataFrame(table_rows, columns=table_titles)
+        df[df.isna()] = 0
+        df = df.style.background_gradient(cmap="RdYlGn",subset=df.columns[2:],vmin=-3,vmax=3)
+        
+        st.table(df)
+
+        st.markdown(r'*log(Bayes-factor)=log[P(prediction|data)/P(comparison|data)]')
+
+
+        st.subheader('Out of distribution tests')
+        st.markdown('SpinForecast predictions should be used only as a guide to aid assignment and should be combined with other methods for validation. Peaks can sometimes be outside of the distribution of disordered residues in the BMRB.')
+        st.markdown('***In-distribution z-score (Z): {:.3f}***'.format(st.session_state.out_of_distribution_zscore[self.peak_choice]))
+        st.markdown('Z > 1 (chemical shifts are well within predicted distributions*)')
+        st.markdown('-1 < Z < 1 (chemical shifts are somewhat within predicted distributions*)')
+        st.markdown('Z < -1 (chemical shifts are far out of predicted distributions*)')
+        st.markdown('*Compared to a reference dataset')
+        
             
             
 
     def perform_checks(self):
         """
-        Perform the following checks before running BindPredictDCS
+        Perform the following checks before running SpinForecast
         - The amino acid code provided is checked to be of the correct format.
         - There must be at least 5-residues.
         - Check that pH, temperature and ionic strength values are valid numbers
