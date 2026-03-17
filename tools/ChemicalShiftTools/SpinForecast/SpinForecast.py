@@ -172,7 +172,7 @@ class SpinForecastBackend():
  
                 try:
                     correction = potenci_condition_correction.filter(pl.col('residue number')==number)[atom].to_list()[0]
-                    distribution_dictionary[atom][number] = df_final.select('chemical shifts (ppm)').collect().to_series().to_numpy() + correction
+                    distribution_dictionary[atom][number] = df_final.select('chemical shifts (ppm)').collect().to_series().to_numpy() - correction
                 except:
                     distribution_dictionary[atom][number] = df_final.select('chemical shifts (ppm)').collect().to_series().to_numpy()
         
