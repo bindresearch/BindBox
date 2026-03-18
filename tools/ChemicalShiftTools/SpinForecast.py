@@ -254,7 +254,7 @@ class SpinForecast():
         fig.update_layout(xaxis = dict(title=xlabel, autorange='reversed'))
         fig.update_layout(yaxis = dict(title=ylabel, autorange='reversed'))
             
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, use_container_width=True, config={"toImageButtonOptions": {"format": "svg","height": 600,"width": 800,"scale": 1}})
 
 
 
@@ -282,7 +282,7 @@ class SpinForecast():
         fig.update_layout(xaxis = dict(title=xlabel, autorange='reversed'))
         fig.update_layout(yaxis = dict(title=ylabel, autorange='reversed'))
             
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, use_container_width=True, config={"toImageButtonOptions": {"format": "svg","height": 600,"width": 800,"scale": 1}})
 
 
     def add_assignment_probabilities(self):
