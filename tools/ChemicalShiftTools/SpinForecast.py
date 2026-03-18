@@ -56,7 +56,7 @@ class SpinForecast():
         perform the DisAssign
         """
         st.title("SpinForecast: Sequence Specific Disordered Chemical Shift Distributions and Assignment")
-        st.markdown("SpinForecast will plot the probability distribution functions for the chemical shift of each atom of each residue in a user-inputed sequence.")
+        st.markdown("SpinForecast will plot the probability distribution functions for the chemical shift of each atom of each residue in a user-inputed sequence. It assumes that every residue within the sequence is disordered. Currently we are testing this tool to determine how accurate it is at reproducing previously reported assignments. Until this benchmarking has been performed, results should be used as a guide and not treated as the ground truth.")
         st.markdown("If you use this tool, please cite the references shown below.")
         st.markdown("**References**")
         st.markdown("SpinForecast (Bind Research, 2026)")
@@ -68,7 +68,10 @@ class SpinForecast():
         # Add logo to the sidebar
         st.logo('./bind-logo-alpha.svg', size="large", link="https://bindresearch.org", icon_image='./bind-logo-alpha.svg')
         
+        
         st.subheader('Sequence and conditions')
+
+        st.markdown('SpinForecast results rely on the protein sequence inserted being disordered. Results have not been tested on sequences and data from proteins with both disordered and structured domains.')
         
         if('aa_sequence' in st.session_state):
             value = st.session_state.aa_sequence
@@ -770,8 +773,9 @@ class SpinForecast():
         percentiles_per_atom = st.session_state.assignment_report[self.peak_choice]['percentiles']
 
           
-        # Assigning a colour based on the Jeffreys scale for log[Bayes-factor]
-        if(max(total_set_evidence.values()) < 0.05):
+        if('out of distribution' in self.peak_choice):
+            color = "#5b1d2c"
+        elif(max(total_set_evidence.values()) < 0.05):
             color = "#5b1d2c"
         elif(max(total_set_evidence.values()) < 0.5):
             color = "#f1b291"
@@ -785,7 +789,7 @@ class SpinForecast():
         fig.update_layout(xaxis = dict(title='Residue'))
         fig.update_layout(yaxis = dict(title='Posterior probability', range=[0,1]))
         if('out of distribution' in self.peak_choice):
-            fig.update_layout(title='Out of distribution error (results not trustworthy)')
+            fig.update_layout(title={'text': 'Out of distribution error (results not trustworthy)', 'x': 0.5, 'xanchor': 'center', 'font': {'size':30}})
             
         st.plotly_chart(fig, use_container_width=True, config={"toImageButtonOptions": {"format": "svg","height": 600,"width": 800,"scale": 1}})
     
@@ -794,7 +798,6 @@ class SpinForecast():
 
         st.subheader('Out of distribution tests')
         st.markdown('SpinForecast predictions should be used only as a guide to aid assignment and should be combined with other methods for validation. Peaks can sometimes be outside of the distribution of disordered residues in the BMRB.')
-        
         st.markdown('Values in the table below represent the **percentile** of the chemical shift distributions (for each predicted assignment) for each atom that the experimental chemical shift appears at. Values below 0.05 and 0.95 indicate that the experimental chemical shift is out of the typical range of the predicted residue. If this is present for multiple atoms, the results should be carefully inspected and cross-validation using strip plots may be necessary to confirm the assignment. Predictions with chemical shifts for more than 1 atom out of the predicted distribution of chemical shifts results in a warning being generated. Note that it is common for amide proton atom (H) chemical shifts to be out of distribution given their significant pH and temperature dependence.')
 
         # Creating a table showing the per-atom evidence for the predictions made
@@ -823,19 +826,19 @@ class SpinForecast():
     
 
         st.subheader("Relative atom contribution to the predictions")
-        st.markdown(r'Values in the table below, P(atom$_i$), represent the posterior probabilities for each prediction excluding the data for atom$_i$. This leave-one-out approach allows the comparison of which atoms (if any) are dominating the assignment predictions.')
-        st.markdown(r'P(atom$_i$) = P(prediction|data[excluding-atom$_i$])-P(prediction|data[all-atoms]])')
+        st.markdown(r'Values in the table below, P(atom$_i$), represent the difference in posterior probabilities for each prediction when excluding the data for atom$_i$. This leave-one-out approach allows the comparison of which atoms (if any) are dominating the assignment predictions.')
+        st.markdown(r'$\Delta$P(atom$_i$) = P(prediction|data[excluding-atom$_i$])-P(prediction|data[all-atoms]])')
    
 
         fig = go.Figure()
-        fig.add_trace(go.Scatter(x=[None], y=[None], mode='markers', marker=dict(colorscale='RdBu', showscale=True, cmin=-1, cmax=1, colorbar=dict(thickness=20, x=0.5, y=0.0, len=0.5, orientation='h', title=dict(text=r"P(atom)", side="top"),   # custom title
+        fig.add_trace(go.Scatter(x=[None], y=[None], mode='markers', marker=dict(colorscale='PuOr', showscale=True, cmin=-1, cmax=1, colorbar=dict(thickness=20, x=0.5, y=0.0, len=0.5, orientation='h', title=dict(text=r"ΔP(atom)", side="top"),   # custom title
                 tickvals=[-1, 0, 1],                 
-                ticktext=["-1<br>Removing atom<br>decreases prediction<br>probability", "0<br>Removing atom<br>doesn't change prediction<br>probability","1<br>Removing atom<br>increases prediction<br>probability"]))))
+                ticktext=["-1<br>Removing atom<br>decreases assignment<br>score", "0<br>Removing atom<br>doesn't change assignment<br>score","1<br>Removing atom<br>increases assignment<br>score"]))))
         
         fig.update_layout(xaxis=dict(showgrid=False, zeroline=False, showticklabels=False, visible=False), yaxis=dict(showgrid=False, zeroline=False, showticklabels=False, visible=False), margin=dict(l=0, r=0, t=0, b=0), height=150)
 
     
-        st.plotly_chart(fig, use_container_width=False)
+        st.plotly_chart(fig, use_container_width=False, config={"displayModeBar": False})
         
         # Creating a table showing the per-atom evidence for the predictions made
         table_titles = ['Prediction']
@@ -852,7 +855,7 @@ class SpinForecast():
 
         df = pd.DataFrame(table_rows, columns=table_titles)
         df[df.isna()] = 0
-        df = df.style.format("{:.2f}", subset=df.columns[1:]).background_gradient(cmap="RdBu",subset=df.columns[1:],vmin=-1,vmax=1)
+        df = df.style.format("{:.2f}", subset=df.columns[1:]).background_gradient(cmap="PuOr",subset=df.columns[1:],vmin=-1,vmax=1)
         
         st.table(df) 
 
