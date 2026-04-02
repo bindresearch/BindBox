@@ -25,6 +25,9 @@ colors = px.colors.qualitative.Alphabet
 
 residues = ['ALA', 'ARG', 'ASN', 'ASP', 'CYS', 'GLN', 'GLU', 'GLY', 'HIS', 'ILE', 'LEU', 'LYS', 'MET', 'PHE', 'PRO', 'SER', 'THR', 'TRP','TYR','VAL']
 
+color_dictionary = {}
+for i, r in enumerate(residues):
+    color_dictionary[r] = colors[i]
 
 
 class bmrb_dashboard():
@@ -822,14 +825,14 @@ TYR 175.49651  57.82427  38.76184 121.43652   8.05749   4.51123   2.91782'''
             residues = dataframe.select("residue").collect().to_series().unique().to_numpy()
             identifier = "residue"
             values = residues
-            color_map = {g: colors[i % len(colors)] for i, g in enumerate(residues)}
+            color_map = color_dictionary
         elif(self.overlays == 'All atoms for selected amino acid'):
             dataframe = self.get_filtered_data(structure = structure, atom = '', residue = self.residue)
             title = f"Overlay Histogram across atoms (amino acid={self.residue})"
             atoms = dataframe.select("atom").collect().to_series().unique().to_numpy()
             identifier = "atom"
             values = atoms
-            color_map = {g: colors[i % len(colors)] for i, g in enumerate(atoms)}
+            color_map = color_dictionary
         else:
             dataframe = self.get_filtered_data(structure = structure, atom = self.atom, residue = self.residue)
             title=f"Normalized Histogram for {self.residue}, {self.atom}"
@@ -855,7 +858,7 @@ TYR 175.49651  57.82427  38.76184 121.43652   8.05749   4.51123   2.91782'''
             values = values_trimmed  
 
 
-            color_map = {g: colors[i % len(colors)] for i, g in enumerate(values)}
+            color_map = color_dictionary
         
         fig = self.plot_histogram(dataframe, title, color=color_map, identifier = identifier, values=values)
 
@@ -873,7 +876,7 @@ TYR 175.49651  57.82427  38.76184 121.43652   8.05749   4.51123   2.91782'''
         df_combined = pl.concat([dataframe_all, dataframe_dis, dataframe_struct, dataframe_dis_corrected], how='vertical')
         df_combined = df_combined.with_columns(pl.concat_str([pl.col("Dataset"),pl.lit(": amino acid="),pl.col("residue")]).alias("Group"))
         values = df_combined.select("residue").unique().collect().to_series().to_numpy()
-        color_map = {g: colors[i % len(colors)] for i, g in enumerate(values)}
+        color_map = color_dictionary
         flag='residue'
 
 
