@@ -56,7 +56,7 @@ class SpinForecast():
         perform the DisAssign
         """
         st.title("SpinForecast: Sequence Specific Disordered Chemical Shift Distributions and Assignment")
-        st.markdown("SpinForecast will plot the probability distribution functions for the chemical shift of each atom of each residue in a user-inputed sequence. It assumes that every residue within the sequence is disordered. Currently we are testing this tool to determine how accurate it is at reproducing previously reported assignments. Until this benchmarking has been performed, results should be used as a guide and not treated as the ground truth.")
+        st.markdown("SpinForecast will plot the probability distribution functions for the chemical shift of each atom of each residue in a user-inputed sequence. It assumes that every residue within the sequence is disordered. Results should be used as a guide and not the ground truth.")
         st.markdown("If you use this tool, please cite the references shown below.")
         st.markdown("**References**")
         st.markdown("SpinForecast (Bind Research, 2026)")
@@ -71,7 +71,7 @@ class SpinForecast():
         
         st.subheader('Sequence and conditions')
 
-        st.markdown('SpinForecast results rely on the protein sequence inserted being disordered. Results have not been tested on sequences and data from proteins with both disordered and structured domains.')
+        st.markdown('SpinForecast results rely on the protein sequence inserted being disordered.')
         
         if('aa_sequence' in st.session_state):
             value = st.session_state.aa_sequence
@@ -317,7 +317,7 @@ class SpinForecast():
                     # Replacing arbitrary whitespace with a single tab (to allow for incorrectly formatted peaklist)
                     cleaned = re.sub(r"[ \t]+", "\t", text)
                     buffer = StringIO(cleaned)
-                    self.dataframe_peaklist = pl.read_csv(buffer, separator="\t")
+                    self.dataframe_peaklist = pl.read_csv(buffer, separator="\t", truncate_ragged_lines=True)
 
                 elif(filetype == '.nef'):
                     self.dataframe_peaklist, error = self.read_nef_file()
@@ -332,7 +332,7 @@ class SpinForecast():
                     for i, column in enumerate(columns):
                         if(i==0):
                             columns_stripped.append(column)
-                        elif(column in ['H', 'N', 'CO', 'C', 'CO(i-1)', 'C(i-1)', 'CA', 'CA(i-1)', 'CB','CB(i-1)', 'HA', 'HB']):
+                        elif(column in ['H', 'N', 'CO', 'C', 'CO(i-1)', 'C(i-1)', 'CA', 'CA(i-1)', 'CB','CB(i-1)', 'HA', 'HB', 'N(i-1)', 'N(i+1)']):
                             columns_stripped.append(column)
                         
                     self.dataframe_peaklist = self.dataframe_peaklist.select(columns_stripped)
@@ -395,13 +395,12 @@ class SpinForecast():
             peak_name = row[1].split('-1')[0]
             iminus1 = ''
             if('-1' in row[1]):
-                iminus1 = '(i-1)'
+                string_addition = '(i-1)'
             if('+1' in peak_name):
-                # Not implemented currently
-                continue
+                string_addition = '(i+1)'
             if(peak_name not in peaklist_dictionary):
                 peaklist_dictionary[peak_name] = {}
-            atom = row[3]+iminus1
+            atom = row[3]+string_addition
             if(atom not in atom_list):
                 atom_list.append(atom)
             shift = float(row[4])
@@ -455,19 +454,18 @@ class SpinForecast():
 
         # Defining weights to describe the contribution of each atom to the overall prediction
         # H chemical shifts are downweighted as they are highly variable compared to other nuclei
-        weights = {'CA':1, 'CA(i-1)':1, 'CB':1, 'CB(i-1)':1, 'N':1, 'C':1,'C(i-1)':1,'CO':1,'CO(i-1)':1, 'H':0.5}
+        weights = {'CA':1, 'CA(i-1)':1, 'CB':1, 'CB(i-1)':1, 'N':1, 'C':1,'C(i-1)':1,'CO':1,'CO(i-1)':1, 'N(i-1)':1, 'N(i+1)':1, 'H':0.5}
 
         for j, checkbox in enumerate(self.column_checkboxes):
             if(checkbox==True):
                 self.atoms.append(columns[j])
                 indexes.append(j+1)
 
-        
-        
 
         dictionaries = {}
         for atom in self.atoms:
             atom_stripped = atom.strip('(i-1)')
+            atom_stripped = atom_stripped.strip('(i+1)')
             dictionaries[atom] = dictionary[atom_stripped]
 
             if('(i-1)' in atom):
@@ -475,6 +473,14 @@ class SpinForecast():
                 dictionary_new = {}
                 for number in dictionaries[atom].keys():
                     dictionary_new[str(int(number)+1)]= dictionaries[atom][number]
+                import copy
+                dictionaries[atom]= copy.deepcopy(dictionary_new)
+            
+            if('(i+1)' in atom):
+                # Need to shift residue numbers - 1 (as the i+1 residue atom is linked to the i residue)
+                dictionary_new = {}
+                for number in dictionaries[atom].keys():
+                    dictionary_new[str(int(number)-1)]= dictionaries[atom][number]
                 import copy
                 dictionaries[atom]= copy.deepcopy(dictionary_new)
 
@@ -709,22 +715,24 @@ class SpinForecast():
                 count = 10
             
 
-
+            peak_name_old = peak_name
 
 
             # Assigning a colour based on the Jeffreys scale
             try:
                 if(count >= 2):
                     peak_name = peak_name + ' (out of distribution detection)'
+                elif(max(likelihoods)>0.99):
+                    peak_name = peak_name + ' (100% probability)'
                 elif(max(likelihoods)>0.75):
-                    peak_name = peak_name + ' (higher likelihood)'
+                    peak_name = peak_name + ' (>75% probability)'
                 elif(max(likelihoods)>0.5):
-                    peak_name = peak_name + ' (medium likelihood)'
+                    peak_name = peak_name + ' (>50% probability)'
                 else:
-                    peak_name = peak_name + ' (small likelihood)'
+                    peak_name = peak_name + ' (<50% probability)'
             except:
                 # usually because no likelihoods were above 0.01 (rare but possible)
-                peak_name = peak_name + ' (small likelihood)'
+                peak_name = peak_name + ' (small probability)'
 
 
             st.session_state.assignment_report[peak_name] = {}
@@ -734,6 +742,9 @@ class SpinForecast():
             st.session_state.assignment_report[peak_name]['total set evidence'] = total_set_evidence
             st.session_state.assignment_report[peak_name]['atom set evidence'] = atom_set_evidence
             st.session_state.assignment_report[peak_name]['percentiles'] = percentile
+
+            st.session_state.assignment_report[peak_name_old] = {}
+            st.session_state.assignment_report[peak_name_old]['percentiles'] = percentile
 
 
             # Saving the predictions to the streamlit session
@@ -753,7 +764,7 @@ class SpinForecast():
 
         st.subheader("Predicted assignments")
         keys = list(st.session_state.possible_assignments.keys())
-        order = {"higher likelihood": 0, "medium likelihood": 1, "small likelihood": 2, "out of distribution detection": 3}
+        order = {"100% probability": 0, ">75% probability": 1, ">50% probability": 2, "<50% probability": 3,"out of distribution detection": 4}
         try:
             sorted_values = sorted(keys, key=lambda x: order[x.split('(')[1].split(')')[0]])
             keys = sorted_values
@@ -781,6 +792,8 @@ class SpinForecast():
             color = "#f1b291"
         elif(max(total_set_evidence.values()) < 0.75):
             color = "#82b3d4"
+        elif(max(total_set_evidence.values())<0.99):
+            color = "#045c96"
         else:
             color = "#1A3367"
 
@@ -863,9 +876,6 @@ class SpinForecast():
         st.markdown('*Note: values in each column do not always add to zero, removing an atom may increase the probabilities of residues not shown in the bar chart above.')
 
 
-    
-
-               
             
             
 
