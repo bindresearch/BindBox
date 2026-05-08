@@ -1418,7 +1418,7 @@ TYR 175.49651  57.82427  38.76184 121.43652   8.05749   4.51123   2.91782'''
         """
         fig = go.Figure()
       
-        for value in values:
+        for j, value in enumerate(values):
             if(value=='No residue'):
                 val_identifier = ''
             else:
@@ -1431,7 +1431,7 @@ TYR 175.49651  57.82427  38.76184 121.43652   8.05749   4.51123   2.91782'''
                 x=x,
                 opacity=0.6,
                 name=str(value) + ', {} shifts'.format(len(x)),
-                marker_color = color[value],
+                marker_color = colors[j],
                 histnorm="probability density",
                 showlegend = True
             ))
