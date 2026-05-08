@@ -16,6 +16,7 @@ def make_homepage():
 
     st.text("This page contains tools developed to study disordered proteins at Bind Research. Where tools are developed by Bind Research, we ask that you please cite our work (where relevant). For open-source tools developed by external researchers but included within these tools, please cite the relevant publications shown for each tool.")
     st.markdown("Our GitHub page contains repositories for the tools developed at Bind Research (https://github.com/orgs/bindresearch)")
+    st.markdown("Video demonstations are available for some of our tools at https://www.youtube.com/@BindResearch")
     st.markdown("For more information on Bind Research, please visit https://bindresearch.org")
 
     st.markdown('')

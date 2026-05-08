@@ -797,8 +797,11 @@ class SpinForecast():
         else:
             color = "#1A3367"
 
-
-        fig = go.Figure(data=[go.Bar(x=names,y=likelihoods, marker={'color': color})])
+        if(len(names)==1):
+            width = 0.2
+        else:
+            width = 0.8
+        fig = go.Figure(data=[go.Bar(x=names,y=likelihoods, marker={'color': color}, width=width)])
         fig.update_layout(xaxis = dict(title='Residue'))
         fig.update_layout(yaxis = dict(title='Posterior probability', range=[0,1]))
         if('out of distribution' in self.peak_choice):

@@ -29,6 +29,9 @@ color_dictionary = {}
 for i, r in enumerate(residues):
     color_dictionary[r] = colors[i]
 
+# Adding a colour for no residue (required when plotting all preceding/following residues)
+color_dictionary['No residue'] = colors[len(residues)]
+
 
 class bmrb_dashboard():
     """
@@ -54,8 +57,6 @@ class bmrb_dashboard():
         self.data_all = data_all.with_columns(pl.lit('All residues').alias('Dataset'))
 
 
-
-
         data_structured = self.read_data('./Shifts_Structured/')
         self.data_structured = data_structured.with_columns(pl.lit('Structured residues').alias('Dataset'))
         self.potenci_shifts = self.define_POTENCI_shifts()
@@ -67,22 +68,23 @@ class bmrb_dashboard():
         self.organism_superkingdoms = self.get_superkingdoms(data_all)
         self.organism_common_names = self.get_common_names(data_all)
 
-        self.create_dashboard()
-        dataframe, fig = self.plot_data()        
-        
-        # Adding the figure plot
-        if(fig != None):
-            fig_aa = self.plot_amino_acid(dataframe)
-            col1, col2 = st.columns([3,1], vertical_alignment="center")
-            col1.plotly_chart(fig, use_container_width=True, config={"toImageButtonOptions": {"format": "svg","height": 600,"width": 800,"scale": 1}})        
-            col2.plotly_chart(fig_aa, config = {'displayModeBar': False}, use_container_width=True)
-            self.add_download_button(dataframe)
+        dashboard = self.create_dashboard()
+        if(dashboard==True):
+            dataframe, fig = self.plot_data()        
+            
+            # Adding the figure plot
+            if(fig != None):
+                fig_aa = self.plot_amino_acid(dataframe)
+                col1, col2 = st.columns([3,1], vertical_alignment="center")
+                col1.plotly_chart(fig, use_container_width=True, config={"toImageButtonOptions": {"format": "svg","height": 600,"width": 800,"scale": 1}})        
+                col2.plotly_chart(fig_aa, config = {'displayModeBar': False}, use_container_width=True)
+                self.add_download_button(dataframe)
 
-        # Add referencing information to the BMRB
-        st.text("Chemical shift source: Biomolecular Magnetic Resonance Data Bank (BMRB) - September 2025")
-        st.markdown("https://doi.org/10.1093/nar/gkac1050")
-        st.markdown("https://bmrb.io")
-        st.text("* Note that mis-assigned residues are not omitted from the results.")
+            # Add referencing information to the BMRB
+            st.text("Chemical shift source: Biomolecular Magnetic Resonance Data Bank (BMRB) - September 2025")
+            st.markdown("https://doi.org/10.1093/nar/gkac1050")
+            st.markdown("https://bmrb.io")
+            st.text("* Note that mis-assigned residues are not omitted from the results.")
 
 
     
@@ -272,23 +274,33 @@ TYR 175.49651  57.82427  38.76184 121.43652   8.05749   4.51123   2.91782'''
         self.show_all = st.sidebar.checkbox("All residues")
         help_structured = """Structured residues are residues not classed as disordered by our definition and excludes residues from proteins described as disordered by the author in the BMRB entry (under physical state). Residues proteins classified as having a denatured physical state are also omitted."""
         self.show_structured = st.sidebar.checkbox("Structured residues", help=help_structured)
-        # Creating a subsection to filter by following/preceding residue
-        st.sidebar.subheader("Preceding/following residue:")
-        self.filter_by_preceding = st.sidebar.checkbox("Filter by preceding residue")
-        if(self.filter_by_preceding):
-            self.preceding_residue = st.sidebar.selectbox("Preceding residue:", self.residues)
-            if(self.overlays == 'Individual amino acid/atom' or self.overlays == 'Individual amino acid/atom 2D'):
-                show_array = [self.show_disordered, self.show_disordered_corrected, self.show_all, self.show_structured]
-                if(show_array.count(True)==1):
-                    self.overlay_preceding = st.sidebar.checkbox("Overlay all preceding residues")
         
-        self.filter_by_following = st.sidebar.checkbox("Filter by following residue")
-        if(self.filter_by_following):
-            self.preceding_residue = st.sidebar.selectbox("Following residue:", self.residues)
-            if(self.overlays == 'Individual amino acid/atom' or self.overlays == 'Individual amino acid/atom 2D'):
-                show_array = [self.show_disordered, self.show_disordered_corrected, self.show_all, self.show_structured]
-                if(show_array.count(True)==1):
-                    self.overlay_following = st.sidebar.checkbox("Overlay all following residues")
+        # Creating a subsection to filter by following/preceding residue
+        count=0
+        if(self.overlays == 'Individual amino acid/atom' or self.overlays == 'Individual amino acid/atom 2D'):
+            st.sidebar.subheader("Preceding/following residue:")
+            self.filter_by_preceding = st.sidebar.checkbox("Filter by preceding residue")
+            if(self.filter_by_preceding):
+                self.preceding_residue = st.sidebar.selectbox("Preceding residue:", self.residues)
+                if(self.overlays == 'Individual amino acid/atom' or self.overlays == 'Individual amino acid/atom 2D'):
+                    show_array = [self.show_disordered, self.show_disordered_corrected, self.show_all, self.show_structured]
+                    if(show_array.count(True)==1):
+                        self.overlay_preceding = st.sidebar.checkbox("Overlay all preceding residues")
+                        count += 1
+            
+            
+            self.filter_by_following = st.sidebar.checkbox("Filter by following residue")
+            if(self.overlays == 'Individual amino acid/atom 2D' and self.atom_2D == 'C-N (1-bond)'):
+                self.filter_by_following = False
+            if(self.filter_by_following):
+                self.following_residue = st.sidebar.selectbox("Following residue:", self.residues)
+                if(self.overlays == 'Individual amino acid/atom' or self.overlays == 'Individual amino acid/atom 2D'):
+                    show_array = [self.show_disordered, self.show_disordered_corrected, self.show_all, self.show_structured]
+                    if(show_array.count(True)==1):
+                        self.overlay_following = st.sidebar.checkbox("Overlay all following residues")
+                        count+=1
+
+
         # Creating a subsection to select which conditions to screen through
         st.sidebar.subheader("Experimental conditions:")
         self.filter_by_sample_state = st.sidebar.checkbox("Filter by sample state", help="e.g. solution, solid, gel etc.")
@@ -350,11 +362,22 @@ TYR 175.49651  57.82427  38.76184 121.43652   8.05749   4.51123   2.91782'''
             
         else:
             self.bin_width = st.sidebar.text_input('Histogram bin width (ppm)', value="0.1")
+
+        self.remove_outliers = st.sidebar.checkbox("Remove outliers")
+        if(self.remove_outliers):
+            self.sigma_box = st.sidebar.text_input('Exclude values +/- nσ, n:', value="3", help='In the case where there are multiple histograms overlaid, this exclusion will be applied to each histogram independently.')
         
-        popup_text = """Available when Individual amino acid/atom is checked and one of Disordered residues/All residues/Structured residues is checked"""
-        self.overlay_fit = st.sidebar.checkbox("Overlay fitted gaussian", help=popup_text)
-        popup_text = """Available when Individual amino acid/atom is checked"""
-        self.overlay_potenci = st.sidebar.checkbox("Overlay POTENCI random coil values", help=popup_text)
+        if(self.overlays == 'Individual amino acid/atom'):
+            popup_text = """Available when Individual amino acid/atom is checked and one of Disordered residues/All residues/Structured residues is checked"""
+            self.overlay_fit = st.sidebar.checkbox("Overlay fitted gaussian", help=popup_text)
+            popup_text = """Available when Individual amino acid/atom is checked"""
+            self.overlay_potenci = st.sidebar.checkbox("Overlay POTENCI random coil values", help=popup_text)
+
+        if(count==2):
+            if(self.overlay_preceding and self.overlay_following):
+                st.error(body = 'Either overlay all preceding residue or overlay all following residues can be selected, not both. Please deselect one option.',icon="🚨")
+                return False
+        return True
 
 
 
@@ -552,28 +575,28 @@ TYR 175.49651  57.82427  38.76184 121.43652   8.05749   4.51123   2.91782'''
 
         dataframe = self.filter_data_by_condition(dataframe)
         dataframe = self.filter_by_organism(dataframe)
-        if(self.filter_by_preceding):
-            if(self.overlays == 'Individual amino acid/atom' or self.overlays == 'Individual amino acid/atom 2D'):
-                try:
-                    if(self.overlay_preceding!=True):
+        if(self.overlays == 'Individual amino acid/atom' or self.overlays == 'Individual amino acid/atom 2D'):
+            if(self.filter_by_preceding):
+                    try:
+                        if(self.overlay_preceding!=True):
+                            try:
+                                if(self.atom_2D != 'C-N (1-bond)'):
+                                    dataframe = self.filter_data_by_neighboring_residues(dataframe, preceding_residue=self.preceding_residue)
+                            except:
+                                dataframe = self.filter_data_by_neighboring_residues(dataframe, preceding_residue=self.preceding_residue)
+                    except:
                         try:
                             if(self.atom_2D != 'C-N (1-bond)'):
                                 dataframe = self.filter_data_by_neighboring_residues(dataframe, preceding_residue=self.preceding_residue)
                         except:
                             dataframe = self.filter_data_by_neighboring_residues(dataframe, preceding_residue=self.preceding_residue)
-                except:
+            if(self.filter_by_following):
+                if(self.overlays == 'Individual amino acid/atom' or self.overlays == 'Individual amino acid/atom 2D'):
                     try:
-                        if(self.atom_2D != 'C-N (1-bond)'):
-                            dataframe = self.filter_data_by_neighboring_residues(dataframe, preceding_residue=self.preceding_residue)
+                        if(self.overlay_following!=True):
+                            dataframe = self.filter_data_by_neighboring_residues(dataframe, following_residue=self.following_residue)
                     except:
-                        dataframe = self.filter_data_by_neighboring_residues(dataframe, preceding_residue=self.preceding_residue)
-        if(self.filter_by_following):
-            if(self.overlays == 'Individual amino acid/atom' or self.overlays == 'Individual amino acid/atom 2D'):
-                try:
-                    if(self.overlay_following!=True):
-                        dataframe = self.filter_data_by_neighboring_residues(dataframe, following_residue=self.preceding_residue)
-                except:
-                    dataframe = self.filter_data_by_neighboring_residues(dataframe, following_residue=self.preceding_residue)
+                        dataframe = self.filter_data_by_neighboring_residues(dataframe, following_residue=self.following_residue)
         return dataframe
     
     def filter_data_by_neighboring_residues(self, dataframe, preceding_residue: str = '', following_residue: str = ''):
@@ -671,7 +694,6 @@ TYR 175.49651  57.82427  38.76184 121.43652   8.05749   4.51123   2.91782'''
         else:
             # Return a warning to say that only one option for "Residues to plot" can be selected while the data selection is XXX
             st.error(body = f'Only one option for \"Residues to plot\" can be selected while the data selection is \"{self.overlays}\". Please select one option from \"Residues to plot\" and try again.',icon="🚨")
-            return None, None
 
         if(self.overlays == 'Individual amino acid/atom 3D'):
             identifier = 'residue'
@@ -850,9 +872,9 @@ TYR 175.49651  57.82427  38.76184 121.43652   8.05749   4.51123   2.91782'''
                 if(value in self.residues):
                     values_trimmed.append(value)
                 elif(value==''):
-                    values_trimmed.append('')
+                    values_trimmed.append('No residue')
                 elif(value==','):
-                    values_trimmed.append('')
+                    values_trimmed.append('No residue')
                 else:
                     pass
             values = values_trimmed  
@@ -956,14 +978,18 @@ TYR 175.49651  57.82427  38.76184 121.43652   8.05749   4.51123   2.91782'''
         """
 
 
-
-        x_edges = np.arange(x.min(), x.max() + float(self.bin_width), float(self.bin_width))
-        y_edges = np.arange(y.min(), y.max() + float(self.bin_width2), float(self.bin_width2))
-        hist, x_edges, y_edges = np.histogram2d(x, y, bins=[x_edges, y_edges])
-        max_idx = np.unravel_index(np.argmax(hist), hist.shape)
-        # Get the center coordinates of that bin
-        x_max = (x_edges[max_idx[0]] + x_edges[max_idx[0]+1]) / 2
-        y_max = (y_edges[max_idx[1]] + y_edges[max_idx[1]+1]) / 2
+        try:
+            x_edges = np.arange(x.min(), x.max() + float(self.bin_width), float(self.bin_width))
+            y_edges = np.arange(y.min(), y.max() + float(self.bin_width2), float(self.bin_width2))
+            hist, x_edges, y_edges = np.histogram2d(x, y, bins=[x_edges, y_edges])
+            max_idx = np.unravel_index(np.argmax(hist), hist.shape)
+            # Get the center coordinates of that bin
+            x_max = (x_edges[max_idx[0]] + x_edges[max_idx[0]+1]) / 2
+            y_max = (y_edges[max_idx[1]] + y_edges[max_idx[1]+1]) / 2
+        
+        except:
+            x_max = np.median(x)
+            y_max = np.median(y)
 
         return x_max, y_max
 
@@ -1056,6 +1082,10 @@ TYR 175.49651  57.82427  38.76184 121.43652   8.05749   4.51123   2.91782'''
                 else:
                     legendgroup = value + ', {} shifts'.format(len(x))
                     showlegend= True
+
+                if(self.remove_outliers):
+                    x = self.remove_outlier_values(x)
+                    y = self.remove_outlier_values(y)
 
                 fig = self.add_2d_contour_trace(fig, colormaps[i], legendgroup, showlegend, x, y)
                 
@@ -1332,6 +1362,34 @@ TYR 175.49651  57.82427  38.76184 121.43652   8.05749   4.51123   2.91782'''
         )
 
         return fig
+    
+
+    def remove_outlier_values(self, x):
+        """
+        Remove outliers +/- n*sigma from the chemical shifts
+
+        Parameters
+        ----------
+        dataframe : pd.DataFrame
+                    Dataframe containing the chemical shifts
+
+        Returns
+        -------
+        x : np.array
+              The chemical shift values with outliers removed
+        
+        """
+        
+        mean = np.mean(x)
+        sigma = np.std(x)
+        n = float(self.sigma_box)
+        filter_arr = x > mean-n*sigma
+        x = x[filter_arr]
+
+        filter_arr = x < mean+n*sigma
+        x = x[filter_arr]
+
+        return x
 
 
     def plot_histogram(self, dataframe, title: str, color: List, identifier: str, values: List) -> go.Figure:
@@ -1361,8 +1419,14 @@ TYR 175.49651  57.82427  38.76184 121.43652   8.05749   4.51123   2.91782'''
         fig = go.Figure()
       
         for value in values:
-            df = dataframe.filter(pl.col(identifier)==value)
-            x=df.select("chemical shifts (ppm)").collect().to_series().to_numpy()
+            if(value=='No residue'):
+                val_identifier = ''
+            else:
+                val_identifier = value
+            df = dataframe.filter(pl.col(identifier)==val_identifier)
+            x = df.select("chemical shifts (ppm)").collect().to_series().to_numpy()
+            if(self.remove_outliers):
+                x = self.remove_outlier_values(x)
             fig.add_trace(go.Histogram(
                 x=x,
                 opacity=0.6,
@@ -1401,6 +1465,9 @@ TYR 175.49651  57.82427  38.76184 121.43652   8.05749   4.51123   2.91782'''
                         name='POTENCI: '+str(self.potenci_shifts[self.residue][self.atom]),
                         line=dict(color="black", width=3, dash="dash")
                         ))
+                else:
+                    st.error(body = 'Overlaying a gaussian is not currently implemented when more than one \"residues to plot\" option is selected',icon="🚨")
+                    
         
             
             elif (self.overlay_potenci):
@@ -1412,6 +1479,7 @@ TYR 175.49651  57.82427  38.76184 121.43652   8.05749   4.51123   2.91782'''
                 name='POTENCI: '+str(self.potenci_shifts[self.residue][self.atom]),
                 line=dict(color="black", width=3, dash="dash")
                 ))
+
     
         fig.update_layout(title=title)
 
@@ -1459,13 +1527,18 @@ TYR 175.49651  57.82427  38.76184 121.43652   8.05749   4.51123   2.91782'''
                         opacity = 0.4
                     else:
                         opacity = 0.2
+
+                    x = filtered.select("chemical shifts (ppm)").collect().to_series().to_numpy()
+                    if(self.remove_outliers):
+                        x = self.remove_outlier_values(x)
+
                     fig.add_trace(go.Histogram(
-                        x=filtered["chemical shifts (ppm)"],
-                        name=f"{dataset_val}: atom={atom}" + ', {} shifts'.format(len(filtered.select('chemical shifts (ppm)').collect().to_series().to_list())),
+                        x=x,
+                        name=f"{dataset_val}: atom={atom}" + ', {} shifts'.format(len(x))),
                         opacity=opacity,
                         marker_color = colormap[atom],
                         histnorm="probability density"
-                    ))
+                    )
         elif(flag == 'residue'):
             for i, residue in enumerate(dataframe.select("residue").unique().collect().to_series().to_numpy()):
                 for dataset_val in residues_to_plot:
@@ -1478,9 +1551,12 @@ TYR 175.49651  57.82427  38.76184 121.43652   8.05749   4.51123   2.91782'''
                         opacity = 0.4
                     else:
                         opacity = 0.2
+                    x = filtered.select("chemical shifts (ppm)").collect().to_series().to_numpy()
+                    if(self.remove_outliers):
+                        x = self.remove_outlier_values(x)
                     fig.add_trace(go.Histogram(
-                        x=filtered.select("chemical shifts (ppm)").collect().to_series().to_numpy(),
-                        name=f"{dataset_val}: amino acid={residue}"+ ', {} shifts'.format(len(filtered.select("chemical shifts (ppm)").collect().to_series().to_list())),
+                        x=x,
+                        name=f"{dataset_val}: amino acid={residue}"+ ', {} shifts'.format(len(x)),
                         opacity=opacity,
                         marker_color=colormap[residue],
                         histnorm="probability density"
