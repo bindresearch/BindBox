@@ -6,7 +6,7 @@ To use this tool locally, perform the following steps:
 - Go into the BindBox directory in a terminal
 - Create a new python virtual environment (e.g. "python3 -m venv ~/BindBoxEnv" for MacOS/Linux)
 - Activate the virtual environment (e.g. "source ~/BindBoxEnv/bin/activate" for MacOS/Linux)
-- Pip install all packages in requirements.txt (e.g. "python3 -m pip install requirements.txt")
+- Pip install all packages in requirements.txt (e.g. "python3 -m pip install -r requirements.txt")
 - Run the BindBox application locally using "streamlit run app.py"
 
 

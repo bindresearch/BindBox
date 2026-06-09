@@ -36,6 +36,9 @@ class potenci_page():
         st.markdown("Temperature corrections (Kjaergaard et al. 2011): https://doi.org/10.1007/s10858-011-9508-2, https://doi.org/10.1007/s10858-011-9472-x")
         st.markdown("pH corrections (Platzer et al. 2014): https://doi.org/10.1007/s10858-014-9862-y")
 
+        st.link_button("Provide feedback", url="https://docs.google.com/forms/d/e/1FAIpQLSdvcsrynionageGwpyUYVL6TBPj2Dktx0R4hJQDHUTr6b574g/viewform?usp=header")
+
+
         # Add logo to the sidebar
         st.logo('./bind-logo-alpha.svg', size="large", link="https://bindresearch.org", icon_image='./bind-logo-alpha.svg')
         
