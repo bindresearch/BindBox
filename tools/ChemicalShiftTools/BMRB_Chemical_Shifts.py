@@ -86,6 +86,9 @@ class bmrb_dashboard():
             st.markdown("https://bmrb.io")
             st.text("* Note that mis-assigned residues are not omitted from the results.")
 
+            st.link_button("Provide Feedback", url="https://docs.google.com/forms/d/e/1FAIpQLSdvcsrynionageGwpyUYVL6TBPj2Dktx0R4hJQDHUTr6b574g/viewform?usp=header")
+
+
 
     
     @st.cache_resource
