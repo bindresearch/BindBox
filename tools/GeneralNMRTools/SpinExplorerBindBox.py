@@ -27,8 +27,8 @@ class SpinExplorer_page():
         st.markdown('Alternatively, the GitHub repo can be cloned and installed manually using pip (https://github.com/bindresearch/SpinExplorer)')
         st.markdown('Documentation is available on the GitHub page and video tutorials will be made available at https://www.youtube.com/@BindResearch')
 
+        st.link_button("Provide Feedback", url="https://docs.google.com/forms/d/e/1FAIpQLSelJLVvliXe-oySuVpN9xs5g4jgxSoRrE_SCzEUBTkJSY-5QA/viewform?usp=header")
 
-        
 
 
 
