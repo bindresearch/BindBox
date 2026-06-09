@@ -17,5 +17,12 @@ def make_tools_list():
     st.text("POTENCI - random coil chemical shift predictor (Frans Mulder lab)")
     st.text("Temperature/pH adjustment predictor (Frans Mulder lab)")
 
+    st.markdown('')
+    st.markdown('')
+    
+    st.markdown("If you have feedback on how we can improve BindBox, we would love to hear from you.")
+    st.link_button("Provide Feedback", url="https://docs.google.com/forms/d/e/1FAIpQLSdvcsrynionageGwpyUYVL6TBPj2Dktx0R4hJQDHUTr6b574g/viewform?usp=header")
+
+
 
 make_tools_list()
