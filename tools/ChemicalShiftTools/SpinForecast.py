@@ -53,7 +53,7 @@ class SpinForecast():
     def create_page(self):
         """
         Create the page for the user to insert the amino acid sequence and conditions to
-        perform the DisAssign
+        perform the SpinForecast
         """
         st.title("SpinForecast: Sequence Specific Disordered Chemical Shift Distributions and Assignment")
         st.markdown("SpinForecast will plot the probability distribution functions for the chemical shift of each atom of each residue in a user-inputed sequence. It assumes that every residue within the sequence is disordered. Results should be used as a guide and not the ground truth.")
@@ -76,16 +76,30 @@ class SpinForecast():
 
         st.markdown('SpinForecast results rely on the protein sequence inserted being disordered.')
         
+        
         if('aa_sequence' in st.session_state):
             value = st.session_state.aa_sequence
         else:
             value=''
+
+        if('sequence_starting_number' in st.session_state):
+            value1 = st.session_state.sequence_starting_number
+        else:
+            value1='1'
+
+
         self.aa_sequence = st.text_area(label='Sequence of amino acids (1 letter codes)', value=value, help='At least 5 residues must be provided. Note, the terminal 2 residues at the N and C terminus are excluded from the results.')
         
+        self.sequence_starting_number = st.text_input(label='Sequence starting number', value=value1, help='This numbering should be adjusted if you wish your sequence numbering to start above 1 (i.e. if your sequence is a truncated construct but you wish to keep the numbering consistent with the full length protein).')
+
+        self.sequence_numbering_offset = str(int(self.sequence_starting_number)-1)
+
         col1, col2, col3 = st.columns(3)
         self.pH_value = col1.text_input(label="pH", value='7.4')
         self.temp_value = col2.text_input(label="Temperature (K)", value='298.0')
         self.ionic_strength = col3.text_input(label="Ionic Strength (M)", value='0.15')
+
+        self.protein_type = st.radio('Protein type', ['Disordered', 'Disordered/Structured (New + Untested)'], horizontal=True, help='Disordered/Structured mode is in testing stage. Do not trust results using this mode currently.')
         st.button('Plot predicted distributions', on_click=self.run_spinforecast)
 
 
@@ -115,14 +129,27 @@ class SpinForecast():
         if(self.perform_checks()==True):
 
             st.session_state.aa_sequence = self.aa_sequence
-            
-            # Get temperature and pH corrections using POTENCI
-            potenci = potenci_backend()
-            potenci_result = potenci.perform_potenci_calc(self.aa_sequence, [self.pH_value, self.temp_value, self.ionic_strength], correction=True, pH_temperature_predict_page=True)
-            potenci_result_df = self.format_results(potenci_result)
+            st.session_state.sequence_starting_number = self.sequence_starting_number
 
-            predict_distributions = SpinForecastBackend()
-            distributions_result = predict_distributions.perform_calc(st.session_state.aa_sequence, potenci_result_df)
+            if(self.protein_type=='Disordered'):
+                disordered_only=True
+            else:
+                disordered_only=False
+
+            predict_distributions = SpinForecastBackend(disordered_only, self.sequence_numbering_offset)
+
+            if(disordered_only==True):
+                # Add temperature and pH corrections using same method at POTENCI as these are well characterised
+            
+                potenci = potenci_backend()
+                potenci_result = potenci.perform_potenci_calc(self.aa_sequence, [self.pH_value, self.temp_value, self.ionic_strength], correction=True, pH_temperature_predict_page=True)
+                potenci_result_df = self.format_results(potenci_result)
+
+                distributions_result = predict_distributions.perform_calc(st.session_state.aa_sequence, potenci_result_df)
+
+            else:
+                # Not additing temperature and pH corrections as these are not well characterised for structured proteins
+                distributions_result = predict_distributions.perform_calc(st.session_state.aa_sequence, '')
             
             # Set the dataframe to the new state
             st.session_state.distribution_dictionary = distributions_result
@@ -145,7 +172,7 @@ class SpinForecast():
             if(residue_dict == {}):
                 continue
             residue_list = []
-            residue_list.append(residue[0])
+            residue_list.append(residue[0]+int(self.sequence_numbering_offset))
             residue_list.append(residue[1])
             order = ['N', 'C', 'CA', 'CB', 'H', 'HA', 'HB']
             for atom in order:
@@ -230,10 +257,10 @@ class SpinForecast():
             max_x = np.argmax(Z, axis=1)
             max_y = np.argmax(Z, axis=0)
                 
-
-            label = residue + self.aa_sequence[int(residue)-1]
-            color = color_dict[self.aa_sequence[int(residue)-1]]
-            colormap = colormap_dict[self.aa_sequence[int(residue)-1]]
+            print(residue)
+            label = residue + self.aa_sequence[int(residue)-1-int(self.sequence_numbering_offset)]
+            color = color_dict[self.aa_sequence[int(residue)-1-int(self.sequence_numbering_offset)]]
+            colormap = colormap_dict[self.aa_sequence[int(residue)-1-int(self.sequence_numbering_offset)]]
 
             # Plotting a 2D histogram based on the xvals and yvals distributions
             fig.add_trace(go.Contour(
@@ -314,6 +341,9 @@ class SpinForecast():
                 filetype = Path(self.uploaded_file.name).suffix
                 if(filetype == '.csv'):
                     self.dataframe_peaklist = pl.read_csv(self.uploaded_file)
+                    # setting empty values to 999
+                    self.dataframe_peaklist= self.dataframe_peaklist.fill_null(999.000)
+
                 elif(filetype == '.tab' or filetype == '.list'):
                     text = self.uploaded_file.getvalue().decode()
 
@@ -321,6 +351,8 @@ class SpinForecast():
                     cleaned = re.sub(r"[ \t]+", "\t", text)
                     buffer = StringIO(cleaned)
                     self.dataframe_peaklist = pl.read_csv(buffer, separator="\t", truncate_ragged_lines=True)
+                    # setting empty values to 999
+                    self.dataframe_peaklist= self.dataframe_peaklist.fill_null(999.000)
 
                 elif(filetype == '.nef'):
                     self.dataframe_peaklist, error = self.read_nef_file()
@@ -358,6 +390,8 @@ class SpinForecast():
             self.column_checkboxes = []
             for j, col in enumerate(cols):
                 self.column_checkboxes.append(col.checkbox(label=columns[j+1], value=True))
+
+            st.markdown('Note: it can be better to omit amide proton chemical shifts (H) from the assignment prediction calculations as their high pH and temperature dependence cannot always be accurately corrected using the temperature and pH correction factors.')
 
             st.markdown('Add a referencing correction (if required) for each atom:')
             dictionary = {}
@@ -632,6 +666,10 @@ class SpinForecast():
         st.session_state.out_of_distribution_score = {}
         st.session_state.possible_assignments_atom_confidence = {}
         st.session_state.assignment_report = {}
+
+
+        st.session_state.out_of_distribution_peaks = []
+
         for k, peak_name in enumerate(peak_names):
 
             probs = probabilities[peak_name]
@@ -650,7 +688,7 @@ class SpinForecast():
             likelihoods = []
         
             for i, d in enumerate(possibilities):
-                names.append(d[0] + self.aa_sequence[int(d[0])-1])
+                names.append(d[0] + self.aa_sequence[int(d[0])-1-int(self.sequence_numbering_offset)])
                 numbers.append(d[0])
                 likelihoods.append(d[1])
             
@@ -812,7 +850,7 @@ class SpinForecast():
             
         st.plotly_chart(fig, use_container_width=True, config={"toImageButtonOptions": {"format": "svg","height": 600,"width": 800,"scale": 1}})
     
-        st.markdown('*This set of predictions excludes predictions with a posterior probability less than 0.01.')
+        st.markdown('*This set of predictions excludes predictions with a posterior probability less than 0.01 (1%)')
 
 
         st.subheader('Out of distribution tests')
@@ -866,7 +904,7 @@ class SpinForecast():
         table_rows = []
 
         for prediction in set_of_predictions:
-            row_set = [prediction+self.aa_sequence[int(prediction)-1]]
+            row_set = [prediction+self.aa_sequence[int(prediction)-1-int(self.sequence_numbering_offset)]]
         
             for atom in list(atom_set_evidence.keys()):
                 row_set.append(atom_set_evidence[atom][prediction])
@@ -904,6 +942,12 @@ class SpinForecast():
         
         if(len(self.aa_sequence)<5):
             st.error(body = f'The amino acid sequence must be at least 5 residues long. The current length is {len(self.aa_sequence)}. Please try again.',icon="🚨")
+            return False
+        
+        try:
+            int(self.sequence_numbering_offset)
+        except:
+            st.error(body = f'The sequence numbering offset provided ({self.sequence_numbering_offset}) could not be converted to an integer. Please try again.',icon="🚨")
             return False
         
         # Check that the user-supplied conditions are valid
