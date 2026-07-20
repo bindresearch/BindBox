@@ -10,9 +10,16 @@ residue_dict_reverse = {v: k for k,v in residue_dict.items()}
 
 
 class SpinForecastBackend():
-    def __init__(self):
+    def __init__(self, disordered_only=True, sequence_numbering_offset=0):
+        
+        self.disordered_only = disordered_only
+        self.sequence_numbering_offset=int(sequence_numbering_offset)
+        
         # Temperature and pH corrected data to pH 7.0 and a temperature of 298K (terminal residues omitted)
         self.data_disordered = self.read_data('./Shifts_Disordered_Corrected_Referenced/')
+        
+        # Data for all residues
+        self.data_all = self.read_data('./Shifts_All_Referenced/')
 
     @st.cache_resource
     def read_data(_self, file_path: str):
@@ -55,6 +62,7 @@ class SpinForecastBackend():
 
         # Convert the sequence to a dataframe showing the nearest neighbor residues (ignoring the terminal residues)
         df = self.calculate_nearest_neighbors(sequence)
+
         shift_distribution_dictionary = self.shifts_distributions(df, potenci_condition_corrections)
         return shift_distribution_dictionary
     
@@ -79,7 +87,8 @@ class SpinForecastBackend():
             else:
                 iminus1 = 'X'
                 # N terminal residues are not corrected for by potenci and must be read separately here
-                self.Nterminal_shifts = self.read_terminal_shifts('./Shifts_Disordered/'+residue_dict_reverse[aa])
+                self.Nterminal_shifts_disordered = self.read_terminal_shifts('./Shifts_Disordered/'+residue_dict_reverse[aa])
+                self.Nterminal_shifts_all = self.read_terminal_shifts('./Shifts_All_Referenced/'+residue_dict_reverse[aa])
 
             index_iplus1 = i+1
             if(index_iplus1<=len(seq_list)-1):
@@ -87,35 +96,49 @@ class SpinForecastBackend():
             else:
                 iplus1 = 'X'
                 # N terminal residues are not corrected for by potenci and must be read separately here
-                self.Cterminal_shifts = self.read_terminal_shifts('./Shifts_Disordered/'+residue_dict_reverse[aa])
+                self.Cterminal_shifts_disordered = self.read_terminal_shifts('./Shifts_Disordered/'+residue_dict_reverse[aa])
+                self.Cterminal_shifts_all = self.read_terminal_shifts('./Shifts_All_Referenced/'+residue_dict_reverse[aa])
        
             
             
-            row = [str(i+1), aa, iplus1, iminus1]
+            row = [str(i+1+self.sequence_numbering_offset), aa, iplus1, iminus1]
             dataframes.append(pl.DataFrame([row], schema={"residue number": str, "amino acid": str, "i+1 residue": str, "i-1 residue": str}, orient='row'))
 
         
         dataframe = pl.concat(dataframes)
 
         return dataframe
+    
+
+
         
     
     def shifts_distributions(self, dataframe_for_sequence, potenci_condition_correction):
         residue_numbers = dataframe_for_sequence['residue number'].to_list()
         distribution_dictionary = {}
+
         for atom in atoms:
             distribution_dictionary[atom] = {}
             for number in residue_numbers:
-                df_total_atom = self.data_disordered.filter(pl.col('atom')==atom)
+                if(self.disordered_only==True):
+                    df_total_atom = self.data_disordered.filter(pl.col('atom')==atom)
+                else:
+                    df_total_atom = self.data_all.filter(pl.col('atom')==atom)
                 
                 df = dataframe_for_sequence.filter(pl.col('residue number')==number)
                 residue = df['amino acid'].to_list()[0]
                 iminus1_residue = df['i-1 residue'].to_list()[0]
                 if(iminus1_residue=='X'):
-                    df_total_atom = self.Nterminal_shifts.filter(pl.col('atom')==atom)
+                    if(self.disordered_only==True):
+                        df_total_atom = self.Nterminal_shifts_disordered.filter(pl.col('atom')==atom)
+                    else:
+                        df_total_atom = self.Nterminal_shifts_all.filter(pl.col('atom')==atom)
                 iplus1_residue = df['i+1 residue'].to_list()[0]
                 if(iplus1_residue == 'X'):
-                    df_total_atom = self.Cterminal_shifts.filter(pl.col('atom')==atom)
+                    if(self.disordered_only==True):
+                        df_total_atom = self.Cterminal_shifts_disordered.filter(pl.col('atom')==atom)
+                    else:
+                        df_total_atom = self.Cterminal_shifts_all.filter(pl.col('atom')==atom)
                 if(atom == 'H' and residue == 'P'):
                     continue
                 if(atom == 'CB' and residue == 'G'):
@@ -126,8 +149,12 @@ class SpinForecastBackend():
                 df1 = df_total_atom
 
                 if(atom=='H'):
-                    df1 = df1.filter(pl.col('chemical shifts (ppm)')<= 9.0)
-                    df1 = df1.filter(pl.col('chemical shifts (ppm)')>= 7.5)
+                    if(self.disordered_only==True):
+                        df1 = df1.filter(pl.col('chemical shifts (ppm)')<= 9.0)
+                        df1 = df1.filter(pl.col('chemical shifts (ppm)')>= 7.5)
+                    else:
+                        df1 = df1.filter(pl.col('chemical shifts (ppm)')<= 10.5)
+                        df1 = df1.filter(pl.col('chemical shifts (ppm)')>= 6.0)
                 elif(atom=='N'):
                     if(residue_dict_reverse[residue]!='PRO'):
                         df1 = df1.filter(pl.col('chemical shifts (ppm)')<= 130.0)
@@ -169,7 +196,7 @@ class SpinForecastBackend():
                 else:
                     df_final = df_total
 
- 
+
                 try:
                     correction = potenci_condition_correction.filter(pl.col('residue number')==number)[atom].to_list()[0]
                     distribution_dictionary[atom][number] = df_final.select('chemical shifts (ppm)').collect().to_series().to_numpy() - correction
