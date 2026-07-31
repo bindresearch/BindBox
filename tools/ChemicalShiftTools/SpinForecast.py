@@ -258,7 +258,6 @@ class SpinForecast():
             max_x = np.argmax(Z, axis=1)
             max_y = np.argmax(Z, axis=0)
                 
-            print(residue)
             label = residue + self.aa_sequence[int(residue)-1-int(self.sequence_numbering_offset)]
             color = color_dict[self.aa_sequence[int(residue)-1-int(self.sequence_numbering_offset)]]
             colormap = colormap_dict[self.aa_sequence[int(residue)-1-int(self.sequence_numbering_offset)]]
@@ -537,7 +536,6 @@ class SpinForecast():
             return
 
         if(self.dataframe_peaklist.select(pl.len()).to_series().to_list()[0]==0):
-            print('No chemical shifts added')
             return
 
         
@@ -990,7 +988,6 @@ class SpinForecast():
             width = 0.8
 
 
-        print(peak_names)
 
         fig = go.Figure(data=[go.Bar(x=peak_names,y=probabilities, marker={'color': colors}, width=width)])
         fig.update_layout(xaxis = dict(title='Peak name'))
