@@ -88,7 +88,7 @@ class SpinForecast():
             value1='1'
 
 
-        self.aa_sequence = st.text_area(label='Sequence of amino acids (1 letter codes)', value=value, help='At least 5 residues must be provided. Note, the terminal 2 residues at the N and C terminus are excluded from the results.')
+        self.aa_sequence = st.text_area(label='Sequence of amino acids (1 letter codes)', value=value, help='At least 5 residues must be provided. Note, the N/C terminal residue distributions are not corrected for temperature and pH in the results.')
         
         self.sequence_starting_number = st.text_input(label='Sequence starting number', value=value1, help='This numbering should be adjusted if you wish your sequence numbering to start above 1 (i.e. if your sequence is a truncated construct but you wish to keep the numbering consistent with the full length protein).')
 
@@ -120,6 +120,7 @@ class SpinForecast():
 
         if('possible_assignments' in st.session_state):
             self.plot_predicted_assignments()
+            self.plot_predicted_per_residue_assignments()
 
     def run_spinforecast(self):
         """
@@ -320,21 +321,37 @@ class SpinForecast():
         Add the functionality for users to input a peaklist and use this for probabilistic assignments
         """
 
-        help_message = '''The peaklist should be in tabular format (.tab/.list), csv or nef (CCPN) format. For tabular and csv formats, the residue column must contain the residue number to link it to the protein sequence.\n
+        help_message = '''The peaklist should be in tabular format (.tab/.list), csv or nef (CCPN) format. For tabular and csv formats, the residue column must contain the residue number to link it to the protein sequence. Column headings for chemical shift columns in csv or tab/list format should be one of the following: H, N, CO, C, CO(i-1), C(i-1), CA, CA(i-1), CB,CB(i-1), HA, HB, N(i-1), N(i+1). Columns with other headings will be ignored.\n
         e.g., (for .tab/.list):\n
-        peak_name\tH\tN\tCA\n
-        \t1H-N\t8.314\t125.242\t52.348\n
-        \t2H-N\t8.450\t121.893\t56.297\n
+        peak_name\tH\tN\tCA\tCA(i-1)\n
+        \t1H-N\t8.314\t125.242\t52.348\t62.085\n
+        \t2H-N\t8.450\t121.893\t56.297\t53.459\n
         e.g., (for .csv)\n
-        1H-N,8.314,125.242,52.348\n
-        2H-N,8.450,121.893,56.297\n
+        peak_name,H,N,CA,CA(i-1)\n
+        1H-N,8.314,125.242,52.348,62.085\n
+        2H-N,8.450,121.893,56.297,53.459\n
         \n
         '''
-        self.uploaded_file = st.file_uploader('Load peaklist"', type=['tab','csv','list','nef'], help=help_message)
+        self.uploaded_file = st.file_uploader('Load peaklist:', type=['tab','csv','list','nef'], help=help_message)
+        st.markdown('*Note that loading a peaklist will reset the table below and all undownloaded manual edits to the peaklist will be lost.')
 
         if "df_peaklist" not in st.session_state or self.uploaded_file is None:
             st.subheader('Loaded chemical shifts:')
-            st.session_state.df_peaklist = pl.DataFrame(schema={"residue":str, "atom 1 (ppm)": float, "atom 2 (ppm)": float, "atom 3 (ppm)": float})       
+            st.session_state.df_peaklist = pl.DataFrame(schema={"residue":str, "H": float, "N": float, "CA": float, "CA(i-1)": float, "CB": float, "CB(i-1)": float, "C": float, "C(i-1)": float, "N(i-1)": float, "N(i+1)": float})
+
+
+        column_config={
+        "H": st.column_config.Column(label="H", help="H - backbone amide proton chemical shift in ppm"),
+        "N": st.column_config.Column(label="N", help="N - backbone amide nitrogen chemical shift in ppm"),
+        "CA": st.column_config.Column(label="CA", help="CA - alpha carbon chemical shift in ppm"),
+        "CA(i-1)": st.column_config.Column(label="CA(i-1)", help="CA(i-1) - alpha carbon chemical shift of the i-1 residue in ppm"),
+        "CB": st.column_config.Column(label="CB", help="CB - beta carbon chemical shift in ppm"),
+        "CB(i-1)": st.column_config.Column(label="CB(i-1)", help="CB(i-1) - beta carbon chemical shift of the i-1 residue in ppm"),
+        "C": st.column_config.Column(label="C", help="C - backbone carbonyl carbon chemical shift in ppm"),
+        "C(i-1)": st.column_config.Column(label="C(i-1)", help="C(i-1) - backbone carbonyl carbon chemical shift of the i-1 residue in ppm"),
+        "N(i-1)": st.column_config.Column(label="N(i-1)", help="N(i-1) - backbone amide nitrogen chemical shift of the i-1 residue in ppm"),
+        "N(i+1)": st.column_config.Column(label="N(i+1)", help="N(i+1) - backbone amide nitrogen chemical shift of the i+1 residue in ppm"),
+        }
 
         if self.uploaded_file is not None:
                 error = False
@@ -376,7 +393,7 @@ class SpinForecast():
 
         self.placeholder2 = st.empty()
         if(len(list(st.session_state.df_peaklist)) > 1):
-            self.placeholder2.dataframe(st.session_state.df_peaklist)
+            self.editable_table = self.placeholder2.data_editor(st.session_state.df_peaklist, num_rows= "dynamic", column_config=column_config)
 
             st.markdown('Missing values in the peaklist are denoted 999 in the table')
 
@@ -401,6 +418,13 @@ class SpinForecast():
             self.reference_df = st.data_editor(df)
 
             st.button("Assess probabilities", on_click=self.assess_probabilities)
+
+            if('report_peaklist_error' not in st.session_state):
+                st.session_state.report_peaklist_error = False
+
+            if(st.session_state.report_peaklist_error==True):
+                st.error(body = f'Some of the residue/peak names supplied in the peaklist are None, please set a name for these peaks and then try again.',icon="🚨")
+                st.session_state.report_peaklist_error = False
 
 
     def read_nef_file(self):
@@ -478,9 +502,44 @@ class SpinForecast():
         # Convert to dictionary-like structure
         data = entry.get_json()
         return data
+
+
+    def check_table(self):
+        """
+        Check if the table has any None elements. Replace None in chemical
+        shift columns with 999 but if any element of the first column
+        (peak/residue name) is None, return an error to the user and 
+        halt the analysis.
+        """
+
+        self.dataframe_peaklist = self.editable_table
+        self.dataframe_peaklist = self.dataframe_peaklist.fill_null(999.000)
+        st.session_state.df_peaklist = self.dataframe_peaklist
+
+        name_column = self.editable_table.select(self.editable_table.columns[0]).to_series().to_list()
+        if(None in name_column):
+            st.session_state.report_peaklist_error = True
+            return False
+        else:
+            st.session_state.report_peaklist_error = False
+
+
+        # Convert any NoneType objects to 999.000
+
+        return True
     
 
     def assess_probabilities(self):
+
+        passed_check = self.check_table()
+
+        if(passed_check==False):
+            return
+
+        if(self.dataframe_peaklist.select(pl.len()).to_series().to_list()[0]==0):
+            print('No chemical shifts added')
+            return
+
         
         dictionary = st.session_state.distribution_dictionary
 
@@ -670,6 +729,10 @@ class SpinForecast():
 
         st.session_state.out_of_distribution_peaks = []
 
+        st.session_state.per_residue_peak_assignments = {}
+        st.session_state.per_residue_peak_assignment_out_of_distribution = {}
+
+
         for k, peak_name in enumerate(peak_names):
 
             probs = probabilities[peak_name]
@@ -678,9 +741,6 @@ class SpinForecast():
                 if(val>0.01):
                     # If the likelihood is larger than 0.01 then these values are included in the list of possible assignments
                     possibilities.append([key,val])
-
-        
-        
 
 
             names = []
@@ -759,7 +819,7 @@ class SpinForecast():
             peak_name_old = peak_name
 
 
-            # Assigning a colour based on the Jeffreys scale
+            # Assigning a colour
             try:
                 if(count >= 2):
                     peak_name = peak_name + ' (out of distribution detection)'
@@ -774,6 +834,46 @@ class SpinForecast():
             except:
                 # usually because no likelihoods were above 0.01 (rare but possible)
                 peak_name = peak_name + ' (small probability)'
+
+
+
+
+            for n, name in enumerate(names):
+                if(numbers[n] not in st.session_state.per_residue_peak_assignments):
+                    st.session_state.per_residue_peak_assignments[numbers[n]] = {'100%': {'peaks':[], 'probabilities':[]},
+                                                                                 '>75%': {'peaks':[], 'probabilities':[]},
+                                                                                 '>50%': {'peaks':[], 'probabilities':[]}}
+                if(numbers[n] not in st.session_state.per_residue_peak_assignment_out_of_distribution):
+                    st.session_state.per_residue_peak_assignment_out_of_distribution[numbers[n]] = {'100%': {'peaks':[], 'probabilities':[]},
+                                                                                                    '>75%': {'peaks':[], 'probabilities':[]},
+                                                                                                    '>50%': {'peaks':[], 'probabilities':[]}}
+                
+                if(likelihoods[n]>0.99):
+                    st.session_state.per_residue_peak_assignments[numbers[n]]['100%']['peaks'].append(peak_name_old)
+                    st.session_state.per_residue_peak_assignments[numbers[n]]['100%']['probabilities'].append(likelihoods[n])
+                    if(count>=2):
+                        st.session_state.per_residue_peak_assignment_out_of_distribution[numbers[n]]['100%']['peaks'].append(peak_name_old)
+                        st.session_state.per_residue_peak_assignment_out_of_distribution[numbers[n]]['100%']['probabilities'].append(likelihoods[n])
+
+                if(likelihoods[n]>0.75):
+                    st.session_state.per_residue_peak_assignments[numbers[n]]['>75%']['peaks'].append(peak_name_old)
+                    st.session_state.per_residue_peak_assignments[numbers[n]]['>75%']['probabilities'].append(likelihoods[n])
+                    if(count>=2):
+                        st.session_state.per_residue_peak_assignment_out_of_distribution[numbers[n]]['>75%']['peaks'].append(peak_name_old)
+                        st.session_state.per_residue_peak_assignment_out_of_distribution[numbers[n]]['>75%']['probabilities'].append(likelihoods[n])
+
+                if(likelihoods[n]>0.5):
+                    st.session_state.per_residue_peak_assignments[numbers[n]]['>50%']['peaks'].append(peak_name_old)
+                    st.session_state.per_residue_peak_assignments[numbers[n]]['>50%']['probabilities'].append(likelihoods[n])
+                    if(count>=2):
+
+                        st.session_state.per_residue_peak_assignment_out_of_distribution[numbers[n]]['>50%']['peaks'].append(peak_name_old)
+                        st.session_state.per_residue_peak_assignment_out_of_distribution[numbers[n]]['>50%']['probabilities'].append(likelihoods[n])
+
+
+
+                
+
 
 
             st.session_state.assignment_report[peak_name] = {}
@@ -793,6 +893,120 @@ class SpinForecast():
             st.session_state.possible_assignments_atom_confidence[peak_name] = atom_score
         
 
+    def plot_predicted_per_residue_assignments(self):
+        """
+        Create predicted per-residue assignment plots with the 
+        aim of showing if multiple peaks have been assigned
+        to the same residue
+        """
+
+        st.subheader("Number of peaks assigned to each residue")
+
+        self.confidence_threshold = st.selectbox("Select assignment confidence threshold:", ['100%','>75%', '>50%'])
+
+        names = []
+        number_assignments = []
+        out_of_distribution_assignment_number = []
+        total_peaks_assigned = {}
+        total_peak_probabilities = {}
+        total_out_of_distribution_peaks_assigned = {}
+
+
+        for i, residue in enumerate(self.aa_sequence):
+            number = i + 1 - (int(self.sequence_numbering_offset))
+            name = str(number)+residue
+            names.append(name)
+
+
+            if(str(number) in list(st.session_state.per_residue_peak_assignments.keys())):
+
+                if(self.confidence_threshold in list(st.session_state.per_residue_peak_assignments[str(number)].keys())):
+
+                    peaks_assigned = st.session_state.per_residue_peak_assignments[str(number)][self.confidence_threshold]['peaks']
+                    peak_probabilities = st.session_state.per_residue_peak_assignments[str(number)][self.confidence_threshold]['probabilities']
+                    out_of_distribution_assignments = st.session_state.per_residue_peak_assignment_out_of_distribution[str(number)][self.confidence_threshold]['peaks']
+                    total_peaks_assigned[name] = peaks_assigned
+                    total_peak_probabilities[name] = peak_probabilities
+                    total_out_of_distribution_peaks_assigned[name] = out_of_distribution_assignments
+                    number_assignments.append(len(peaks_assigned))
+                    out_of_distribution_assignment_number.append(len(out_of_distribution_assignments))
+
+
+                else:
+                    number_assignments.append(0)
+                    out_of_distribution_assignment_number.append(0)
+
+            else:
+                number_assignments.append(0)
+                out_of_distribution_assignment_number.append(0)
+            
+
+
+
+
+        if(self.confidence_threshold=='100%'):
+            color = "#1A3367"
+        elif(self.confidence_threshold=='>75%'):
+            color = "#045c96"
+        else:
+            color = "#82b3d4"
+
+
+
+        fig = go.Figure(data=[go.Bar(x=names,y=number_assignments, marker={'color': color}, name='Total assignments'), go.Bar(x=names,y=out_of_distribution_assignment_number, marker={'color': "#5b1d2c"}, name = 'Out-of-distribution assignments')])
+        fig.update_layout(xaxis = dict(title='Residue number'))
+        fig.update_layout(yaxis = dict(title='Number of assignments',tickmode='linear', tick0=0, dtick=1))
+        fig.update_layout(barmode='overlay',bargap=0)
+
+        st.plotly_chart(fig, use_container_width=True, config={"toImageButtonOptions": {"format": "svg","height": 600,"width": 800,"scale": 1}})
+            
+
+
+        self.selected_residue = st.selectbox("Select residue:", names)
+
+
+        try:
+
+            peak_names = total_peaks_assigned[self.selected_residue]
+            probabilities = total_peak_probabilities[self.selected_residue]
+            out_of_distribution_names = total_out_of_distribution_peaks_assigned[self.selected_residue]
+
+        except:
+            peak_names = []
+            probabilities = []
+            out_of_distribution_names = []
+
+        colors = []
+        for peak_name in peak_names:
+            if(peak_name in out_of_distribution_names):
+                colors.append("#5b1d2c")
+            else:
+                colors.append(color)
+
+
+        if(len(peak_names)==1):
+            width = 0.2
+        else:
+            width = 0.8
+
+
+        print(peak_names)
+
+        fig = go.Figure(data=[go.Bar(x=peak_names,y=probabilities, marker={'color': colors}, width=width)])
+        fig.update_layout(xaxis = dict(title='Peak name'))
+        fig.update_layout(yaxis = dict(title='Posterior probability', range=[0,1]))
+
+        if(len(peak_names)==0):
+            fig.update_layout(title={'text': 'No assignments for the selected residue with probability above the set threshold', 'x': 0.5, 'xanchor': 'center', 'font': {'size':15}})
+        else:
+            fig.update_layout(title={'text': 'Peaks assigned to the selected residue with probability above the set threshold', 'x': 0.5, 'xanchor': 'center', 'font': {'size':15}})
+
+        st.plotly_chart(fig, use_container_width=True, config={"toImageButtonOptions": {"format": "svg","height": 600,"width": 800,"scale": 1}})
+    
+
+
+
+        
 
 
     def plot_predicted_assignments(self):
@@ -801,7 +1015,6 @@ class SpinForecast():
         predicted assignments and their respective likelihoods are plotted
         in a bar chart
         """
-
 
         st.subheader("Predicted assignments")
         keys = list(st.session_state.possible_assignments.keys())
@@ -920,7 +1133,8 @@ class SpinForecast():
         st.markdown('*Note: values in each column do not always add to zero, removing an atom may increase the probabilities of residues not shown in the bar chart above.')
 
 
-            
+    def perform_peaklist_checks(self):
+        pass
             
 
     def perform_checks(self):

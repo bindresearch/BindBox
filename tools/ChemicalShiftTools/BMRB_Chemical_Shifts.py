@@ -53,6 +53,9 @@ class bmrb_dashboard():
         self.data_disordered_corrected = self.data_disordered_corrected.drop('correction addition')
         self.data_disordered_corrected = self.data_disordered_corrected.drop('potenci predicted')
 
+
+        
+
         data_all = self.read_data('./Shifts_All/')
         self.data_all = data_all.with_columns(pl.lit('All residues').alias('Dataset'))
 
@@ -106,6 +109,7 @@ class bmrb_dashboard():
                 df_total = pl.concat([df_total, df], how='vertical')
 
         return df_total
+
     
     
     @st.cache_data
