@@ -320,7 +320,7 @@ class SpinForecast():
         Add the functionality for users to input a peaklist and use this for probabilistic assignments
         """
 
-        help_message = '''The peaklist should be in tabular format (.tab/.list), csv or nef (CCPN) format. For tabular and csv formats, the residue column must contain the residue number to link it to the protein sequence. Column headings for chemical shift columns in csv or tab/list format should be one of the following: H, N, CO, C, CO(i-1), C(i-1), CA, CA(i-1), CB,CB(i-1), HA, HB, N(i-1), N(i+1). Columns with other headings will be ignored.\n
+        help_message = '''The peaklist should be in tabular format (.tab/.list), csv or nef (CCPN) format. For NEF (CCPN) uploads, SpinForecast will read the chemical shifts stored under the name "nef_chemical_shift_list_default" in the .nef file. Column headings for chemical shift columns in csv or tab/list format should be one of the following: H, N, CO, C, CO(i-1), C(i-1), CA, CA(i-1), CB,CB(i-1), HA, HB, N(i-1), N(i+1). Columns with other headings will be ignored.\n
         e.g., (for .tab/.list):\n
         peak_name\tH\tN\tCA\tCA(i-1)\n
         \t1H-N\t8.314\t125.242\t52.348\t62.085\n
