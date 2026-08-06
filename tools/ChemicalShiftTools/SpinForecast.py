@@ -42,8 +42,8 @@ else:
 
 class SpinForecast():
     """
-    This class will produce a page to perform potenci random coil
-    chemical shift prediction.
+    This class will produce a page to perform SpinForecast chemical shift prediction
+    and assignment
     """
     def __init__(self):
 
@@ -59,7 +59,7 @@ class SpinForecast():
         st.markdown("SpinForecast will plot the probability distribution functions for the chemical shift of each atom of each residue in a user-inputed sequence. It assumes that every residue within the sequence is disordered. Results should be used as a guide and not the ground truth.")
         st.markdown("If you use this tool, please cite the references shown below.")
         st.markdown("**References**")
-        st.markdown("SpinForecast (Bind Research, 2026)")
+        st.markdown("SpinForecast bioRxiv (Bind Research, 2026): https://doi.org/10.64898/2026.07.31.740808")
         st.markdown("BMRB: https://doi.org/10.1093/nar/gkac1050, https://bmrb.io")
         st.markdown("POTENCI (Nielsen and Mulder, 2018): https://doi.org/10.1007/s10858-018-0166-5")
         st.markdown("Temperature corrections (Kjaergaard et al. 2011): https://doi.org/10.1007/s10858-011-9508-2, https://doi.org/10.1007/s10858-011-9472-x")
